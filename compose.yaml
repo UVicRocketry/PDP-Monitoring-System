@@ -1,0 +1,16 @@
+version: '1'
+
+services:
+  server:
+    build: 
+      context: ./MCC
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+
+  client:
+    build: 
+      context: ./VC
+      dockerfile: Dockerfile
+    stdin_open: true
+    tty: true
