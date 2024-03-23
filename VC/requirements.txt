@@ -1,1 +1,4 @@
 websockets
+LabJackPython
+pyserial
+logbook

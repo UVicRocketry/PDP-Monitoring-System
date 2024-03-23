@@ -1,1 +1,3 @@
-/node_modules
+__pychache__
+serial.log
+instrumenation.log
