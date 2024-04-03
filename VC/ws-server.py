@@ -39,7 +39,7 @@ class WebSocketServer:
     async def _handle_message(self, websocket, message):
         '''
         Name:
-            WebSocketServer._handle_message(websocket= websockets.WebSocketServerProtocol, message= str) -> None
+            WebSocketServer._handle_message(websocket=websockets.WebSocketServerProtocol, message= str) -> None
         Args:
             websocket: the websocket connection
             message: the message to handle

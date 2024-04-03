@@ -8,7 +8,12 @@ class InstrumentationLogPhrases(Enum):
     STATUS = "Status",
     RESET_SENSOR = "Reset Sensor",
     STREAM_SENSORS = "Stream Sensors",
-    SAMPLE_SENSORS = "Sample Sensors"
+    SAMPLE_SENSORS = "Sample Sensors",
+    NO_DATA = "No data",
+    FAILED_TO_STREAM = "Failed to stream",
+    STREAMING_FINISHED = "Streaming finished",
+    QUEUE_EMPTY_ENDING_STREAM = "Queue Empty, ending stream",
+
 
 class ControlsLogPhrases(Enum):
     CONNECTED_TO_MCC = "Connected to MCC",
