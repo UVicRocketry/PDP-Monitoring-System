@@ -6,12 +6,12 @@ This repository contains the server for used on valve cart. The server runs off 
 
 # Table of Contents
 
-## [1. Installation Guide](docs/guides.md#installation-guide)
-## [2. Serial Interface](docs/serial-api.md#serial-interface)
-### [2.1 Command Structure](docs/serial-api.md#command-structure)
-#### [2.2 Source Tags](docs/serial-api.md#source-tags)
-## [3. Communication](docs/comms.md#communication)
-### [3.1 TP-Links](docs/comms.md#tp-links)
-#### [3.2 Setup](docs/comms.md#setup)
-## [4. API](docs/api.md)
-### [4.1 Websocket API](docs/ws-api.md)
+## [1. Installation Guide](Docs/guides.md#installation-guide)
+## [2. Serial Interface](Docs/serial-api.md#serial-interface)
+### [2.1 Command Structure](Docs/serial-api.md#command-structure)
+#### [2.2 Source Tags](Docs/serial-api.md#source-tags)
+## [3. Communication](Docs/comms.md#communication)
+### [3.1 TP-Links](Docs/comms.md#tp-links)
+#### [3.2 Setup](Docs/comms.md#setup)
+## [4. API](Docs/api.md)
+### [4.1 Websocket API](Docs/ws-api.md)
