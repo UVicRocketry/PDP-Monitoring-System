@@ -11,4 +11,4 @@ COPY . /VC
 RUN pip install --no-cache-dir -r /VC/requirements.txt
 
 # Run the server.py script when the container launches
-CMD ["python", "server.py"]
+CMD ["python", "main.py"]
