@@ -1,0 +1,50 @@
+[WebSocketServer] 2024-04-06 20:11:00,825 [INFO]: WS Logger configured
+
+[WebSocketServer] 2024-04-06 20:11:00,827 [INFO]: Serial interface initialized
+
+[WebSocketServer] 2024-04-06 20:11:00,829 [ERROR]: Failed to initailize labjack: LabJack not found
+Traceback (most recent call last):
+  File "C:\Users\lemie\Documents\2 - Code\PDP-Monitoring-System\VC\server\ws_server.py", line 37, in __init__
+    self.__labjack = LabJackU6Driver()
+                     ^^^^^^^^^^^^^^^^^
+  File "C:\Users\lemie\Documents\2 - Code\PDP-Monitoring-System\VC\instrumentation\labjackDriver.py", line 23, in __init__
+    self.__d = u6.U6()
+               ^^^^^^^
+  File "C:\Users\lemie\AppData\Local\Programs\Python\Python311\Lib\site-packages\u6.py", line 216, in __init__
+    self.open(**kargs)
+  File "C:\Users\lemie\AppData\Local\Programs\Python\Python311\Lib\site-packages\u6.py", line 233, in open
+    Device.open(self, 6, firstFound = firstFound, serial = serial, localId = localId, devNumber = devNumber, handleOnly = handleOnly, LJSocket = LJSocket )
+  File "C:\Users\lemie\AppData\Local\Programs\Python\Python311\Lib\site-packages\LabJackPython.py", line 627, in open
+    d = openLabJack(devType, ct, firstFound = True, handleOnly = handleOnly, LJSocket = LJSocket)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\lemie\AppData\Local\Programs\Python\Python311\Lib\site-packages\LabJackPython.py", line 1409, in openLabJack
+    handle = _openLabJackUsingUDDriver(deviceType, connectionType, firstFound, pAddress, devNumber)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\lemie\AppData\Local\Programs\Python\Python311\Lib\site-packages\LabJackPython.py", line 1252, in _openLabJackUsingUDDriver
+    raise LabJackException(ec)
+LabJackPython.LabJackException: LabJack not found
+[WebSocketServer] 2024-04-06 20:11:31,294 [ERROR]: INVALID COMMAND: {}
+NoneType: None
+[WebSocketServer] 2024-04-06 20:11:31,294 [ERROR]: INVALID COMMAND: {}
+NoneType: None
+[WebSocketServer] 2024-04-06 20:11:35,067 [INFO]: SENDING COMMAND: VC,CTRL,NCV,OPEN
+
+
+[WebSocketServer] 2024-04-06 20:11:52,798 [INFO]: SENDING COMMAND: VC,CTRL,NCV,CLOSE
+
+
+[WebSocketServer] 2024-04-06 20:11:55,075 [INFO]: SENDING COMMAND: VC,CTRL,NCV,OPEN
+
+
+[WebSocketServer] 2024-04-06 20:12:03,980 [INFO]: SENDING COMMAND: VC,CTRL,EVV,OPEN
+
+
+[WebSocketServer] 2024-04-06 20:12:35,255 [INFO]: SENDING COMMAND: VC,CTRL,EVV,CLOSE
+
+
+[WebSocketServer] 2024-04-06 20:12:35,869 [INFO]: SENDING COMMAND: VC,CTRL,NCV,CLOSE
+
+
+[WebSocketServer] 2024-04-06 20:12:36,460 [INFO]: SENDING COMMAND: VC,CTRL,N2V,OPEN
+
+

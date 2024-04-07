@@ -1,8 +1,11 @@
 import asyncio
 import websockets
 import json
-from serialInterface import SerialInterface
-from labjackDriver import LabJackU6Driver
+from serialInterface.serialInterface import SerialInterface
+from instrumentation.labjackDriver import LabJackU6Driver
+import logging
+
+__name__ = "WebSocketServer"
 
 class Command:
     def __init__(self, command, valve, action):
@@ -14,16 +17,44 @@ class WebSocketServer:
     def __init__(self, host="localhost", port=8888):
         self.__host = host
         self.__port = port
-        self.server = None
-        self.server_continue = None
+
+        self.__logger = logging.getLogger(__name__)
+        self.__log_handler = None
+
+        self.__configure_log()
+
+        self.__serial_interface = None
+        self.__labjack = None
+
         try:
-            self._serial_interface = SerialInterface()
-        except:
+            self.__serial_interface = SerialInterface()
+            self.__logger.info("Serial interface initialized\n")
+        except Exception as e:
+            self.__logger.error(f"Failed to initialize serial interface: {e}\n", exc_info=True)
             pass
+
         try:
-            self.labjack = LabJackU6Driver()
-        except:
-            pass
+            self.__labjack = LabJackU6Driver()
+            self.__logger.info("Labjack Driver initialized\n")
+        except Exception as e:
+            self.__logger.error(f"Failed to initailize labjack: {e}\n", exc_info=True)
+
+
+    def __configure_log(self):
+        '''
+        Name:
+            WebSocketServer.__configure_log() -> None
+        Desc:
+            Configures the log file
+        '''
+        self.__log_handler = logging.FileHandler('ws-server.log', mode='w')
+        formatter = logging.Formatter('[%(name)s] %(asctime)s [%(levelname)s]: %(message)s')
+        self.__log_handler.setFormatter(formatter)
+        self.__logger.addHandler(self.__log_handler)
+        self.__logger.setLevel(logging.INFO)
+        self.__logger.info("WS Logger configured\n")
+
+
     async def _handler(self, websocket):
         ''' 
         Name:
@@ -35,7 +66,8 @@ class WebSocketServer:
         '''
         async for message in websocket:
             await self._handle_message(websocket, message)
-    
+
+
     async def _handle_message(self, websocket, message):
         '''
         Name:
@@ -56,20 +88,25 @@ class WebSocketServer:
                     message['valve'], 
                     message['action'])
 
-                command_message = self._serial_interface.build_message(
+                command_message = self.__serial_interface.build_message(
                     command.command, 
                     command.valve, 
                     command.action)
+                
+                self.__logger.info(f"SENDING COMMAND: {command_message}\n")
 
-                self._serial_interface.send(command_message)
-                await websocket.send(json.dumps({'identifier': 'CONTROLS', 'data': 'Controls received'}))
+                self.__serial_interface.send(command_message)
+                try: 
+                    await websocket.send(json.dumps({'identifier': 'CONTROLS', 'data': 'Controls received'}))
+                except Exception as e:
+                    self.__logger.error(f"Failed to send message: {e}", exc_info=True)
 
-            case 'INFO':
-
+            case 'CONFIGURATION':
                 pass
             case 'INSTRUMENTATION':
                 pass
             case _:
+                self.__logger.error(f"INVALID COMMAND: {message}", exc_info=True)
                 pass
 
     
@@ -84,7 +121,8 @@ class WebSocketServer:
             Sends a message to the mission control
         '''
         await websocket.send(message)
-    
+
+
     async def start(self):
         '''
         Name:
@@ -94,6 +132,3 @@ class WebSocketServer:
         '''
         async with websockets.serve(self._handler, self.__host, self.__port):
             await asyncio.Future()
-
-socket = WebSocketServer()
-asyncio.run(socket.start())

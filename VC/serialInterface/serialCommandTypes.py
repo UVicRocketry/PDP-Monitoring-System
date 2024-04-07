@@ -1,5 +1,7 @@
 from enum import Enum
 
+__name__ = "serialCommandTypes"
+
 SOURCE_TAG = "VC"
 
 class Valves(Enum):

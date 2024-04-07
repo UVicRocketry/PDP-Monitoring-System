@@ -1,24 +1,69 @@
 # reference https://github.com/UVicRocketry/Hybrid-Controls-System/blob/33-comms-prot-fixing/src/MCC_GUI/comm.py
-
-import serial 
+import serial
 import queue
-import logbook
-import os
-import sys
-from serialCommandTypes import Valves, DataTypes, DataLabels, DataValues, SOURCE_TAG
+import logging
+from enum import Enum
+from .serialCommandTypes import Valves, DataTypes, DataLabels, DataValues, SOURCE_TAG
+
+__name__ = "SerialInterface"
+
+class ResponseCommandType(Enum):
+    SUMMARY = "SUMMARY"
+    START_UP = "STARTUP"
+    STATUS = "STATUS"
+    SWITCH_STATE = "SWITCHSTATE"
+    DISARMED = "DISARMED"
+    ARMED = "ARMED"
+    ABORTED = "ABORTED"
+    ERROR = "ERROR"
+    UNKNOWN_COMMAND = "UNKNOWNCOMMAND"
 
 class SerialInterface:
+    """
+    Name:
+        SerialInterface
+    Desc:
+        The serial interface for the VC to communicate with the controls arduino
+
+    Attributes:
+
+    Public:
+        message_queue: the queue for messages
+        control_queue: the queue for control messages
+        verbose: the verbosity of the interface
+        connected: the connection status
+        status: the status of the connection
+        valves: the list of valves
+    
+    Public Methods:
+        init_connection: initializes the connection
+        message_pending: checks if there is a message pending
+        close: closes the serial port
+        send: sends a message
+        build_message: builds a message
+        process_command: processes a command
+        _process_summary_command: processes a summary command
+
+    """
     def __init__(self):
         self._message_queue = queue.Queue()
         self._control_queue = queue.Queue()
         self._verbose=False
-        self._logger = logbook.Logger("SerialInterface")
-        self.__log = None
-        self._port = "COM6" #set blank port if no config file
+
+        self._logger = logging.getLogger(__name__)
+        self.__log_handler = None
+        self.__configure_log()
+
+        # lists all possible com ports
+        self.__possible_ports = None
+        self.__port = None 
+        self._stream = None
+        self.__init_stream()
+
         self._connected = False
-        self._desyncList=[]
         self._status="DCONN"
-        self.valves= [
+
+        self.valves = [
             Valves.N2OF,
             Valves.N2OV,
             Valves.N2F,
@@ -29,9 +74,8 @@ class SerialInterface:
             Valves.IGFIRE,
             Valves.MEV
         ]
-        self.__configure_log()
-        self.__init_stream()
-    
+
+
     def __configure_log(self):
         '''
         Name:
@@ -39,9 +83,13 @@ class SerialInterface:
         Desc:
             Configures the log file
         '''
-        self.__log = logbook.FileHandler('serial.log', level='DEBUG', bubble=True)
-        self.__log.format_string = '{record.time:%Y-%m-%d %H:%M:%S.%f%z} [{record.level_name}] {record.channel}: {record.message}'
-        self.__log.push_application()
+        self.__log_handler = logging.FileHandler('serial.log', mode='w')
+        formatter = logging.Formatter('[%(name)s] %(asctime)s [%(levelname)s]: %(message)s')
+        self.__log_handler.setFormatter(formatter)
+        self._logger.addHandler(self.__log_handler)
+        self._logger.setLevel(logging.INFO)
+        self._logger.info("Serial Logger configured")
+
 
     def __init_stream(self):
         '''
@@ -51,11 +99,21 @@ class SerialInterface:
             Initializes the serial port and sets the connection status
         '''
         try:
-            self._stream = serial.Serial(port="COM6", baudrate=115200, timeout=0.1)
-        except serial.SerialException as e:
+            try:
+                self.__possible_ports = serial.tools.list_ports.comports()
+            except Exception as e:
+                self._logger.error(f"failed to list ports: {e}")
+
+            for port in self.__possible_ports:
+                if "USB" in port.device:
+                    self.__port = port.device
+                    break
+            self.__port = self.__port if self.__port else 'COM6'
+            self._stream = serial.Serial(port=self.__port, baudrate=115200, timeout=0.1)
+        except Exception as e:
             print(f"failed to open serial: {e}")
             pass
-    
+
 
     def init_connection(self):
         '''
@@ -78,7 +136,8 @@ class SerialInterface:
             except queue.Empty:
                 self._status = "ERR"
                 break
-    
+
+
     @property
     def message_pending(self) -> bool:
         '''
@@ -96,7 +155,7 @@ class SerialInterface:
                 return False
         except:
             return False
-    
+ 
 
     def close(self) -> bool:
         '''
@@ -146,8 +205,8 @@ class SerialInterface:
             return True
         except:
             return False
-        
-    
+     
+
     def _receive(self) -> bool:
         '''
         Name: 
@@ -165,7 +224,7 @@ class SerialInterface:
                 message = message.strip()
                 self.message_queue.put(message)
             else: 
-                self._log.log("WARN", f"Received incomplete message: {message}")
+                self._logger.info(f"Received incomplete message: {message}")
 
             if "ABORT" in message:
                 with self.message_queue.mutex:
@@ -173,11 +232,12 @@ class SerialInterface:
                 self.message_queue.put(message)
 
         except:
-            self._log.log("WARN", f"Failed to receive: {message}")
+            self._logger.info(f"Failed to receive: {message}")
             return False
         
         return True
-    
+
+
     def build_message(self, data_type, data_label, data_value, source_tag=SOURCE_TAG) -> str:
         '''
         Name:
@@ -195,6 +255,7 @@ class SerialInterface:
         # example message f"VC,CTRL,MEV,OPEN\n"
         return f"VC,{data_type},{data_label},{data_value}\n"
 
+
     def process_command(self, message):
         '''
         Name:
@@ -204,13 +265,47 @@ class SerialInterface:
         Desc:
             Processes a message from the MCC
         '''
-        if "," in message:
-            current_message = message.split(",")
-            match current_message[0]:
-                case DataTypes.SUMMARY:
-                    self._process_summary_command(current_message)
-                case _:
-                    self._log.log("ERROR", f"Invalid message: {message}")
+        is_message_processed = False
+        if message in ',':
+            message_array = message.split(',')
+            match message_array[1]:
+                case ResponseCommandType.SWITCH_STATE:
+                    try:
+                        self.__logger.info(f"SET SWITCH STATE: {message_array[2]}, {message_array[2]}")
+                        # send to 
+                        is_message_processed = True
+                    except:
+                        is_message_processed = False
+                    return is_message_processed
+                
+                case ResponseCommandType.STATUS:
+
+                    if message_array[2] == ResponseCommandType.START_UP:
+                        pass
+                    
+                    elif message_array[2] == ResponseCommandType.DISARMED:
+                        pass
+
+                    elif message_array[2] == ResponseCommandType.ARMED:
+                        pass
+
+                    elif message_array[2] == ResponseCommandType.ABORTED:
+                        pass
+
+                    elif message_array[2] == ResponseCommandType.ERROR:
+                        pass
+
+                    else:
+                        self.__logger.error(f"UNKNOWN STATUS: {message_array[2]}")
+            
+                case ResponseCommandType.SUMMARY:
+                    try:
+                        self.__logger.info(f"SUMMARY: {message_array[2]}")
+                        is_message_processed = True
+                    except:
+                        is_message_processed = False
+                    return is_message_processed
+
 
     def _process_summary_command(self, message):
         '''
@@ -222,8 +317,8 @@ class SerialInterface:
             Processes a summary command from the Mission Control
         '''
         if self._verbose:
-            self._log.log("INFO", f"Received summary command: {message}")
+            self._logger.info("INFO", f"Received summary command: {message}")
         for i in range(2, len(message), 2):
             self._conf[message[i]] = message[i + 1]
             if self._verbose:
-                self._log.log(f"INFO {message[i]} {message[i + 1]}")
+                self._logger.info(f"INFO {message[i]} {message[i + 1]}")
