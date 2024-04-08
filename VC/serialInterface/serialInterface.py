@@ -4,8 +4,11 @@ import queue
 import logging
 from enum import Enum
 from .serialCommandTypes import Valves, DataTypes, DataLabels, DataValues, SOURCE_TAG
+import platform
 
 __name__ = "SerialInterface"
+
+OS = platform.system()
 
 class ResponseCommandType(Enum):
     SUMMARY = "SUMMARY"
@@ -40,7 +43,7 @@ class SerialInterface:
         message_pending: checks if there is a message pending
         close: closes the serial port
         send: sends a message
-        build_message: builds a message
+        build_valve_message: builds a message
         process_command: processes a command
         _process_summary_command: processes a summary command
 
@@ -50,7 +53,7 @@ class SerialInterface:
         self._control_queue = queue.Queue()
         self._verbose=False
 
-        self._logger = logging.getLogger(__name__)
+        self.__logger = logging.getLogger(__name__)
         self.__log_handler = None
         self.__configure_log()
 
@@ -86,9 +89,9 @@ class SerialInterface:
         self.__log_handler = logging.FileHandler('serial.log', mode='w')
         formatter = logging.Formatter('[%(name)s] %(asctime)s [%(levelname)s]: %(message)s')
         self.__log_handler.setFormatter(formatter)
-        self._logger.addHandler(self.__log_handler)
-        self._logger.setLevel(logging.INFO)
-        self._logger.info("Serial Logger configured")
+        self.__logger.addHandler(self.__log_handler)
+        self.__logger.setLevel(logging.INFO)
+        self.__logger.info("Serial Logger configured")
 
 
     def __init_stream(self):
@@ -99,19 +102,12 @@ class SerialInterface:
             Initializes the serial port and sets the connection status
         '''
         try:
-            try:
-                self.__possible_ports = serial.tools.list_ports.comports()
-            except Exception as e:
-                self._logger.error(f"failed to list ports: {e}")
-
-            for port in self.__possible_ports:
-                if "USB" in port.device:
-                    self.__port = port.device
-                    break
-            self.__port = self.__port if self.__port else 'COM6'
+            print("OS: ", OS)
+            self.__port = 'COM6' if str(OS) == 'Windows' else '/dev/ttyACM0' # update this to the correct port for the VC mini PC
             self._stream = serial.Serial(port=self.__port, baudrate=115200, timeout=0.1)
+            self.__logger.info(f"Opened serial port: {self.__port}")
         except Exception as e:
-            print(f"failed to open serial: {e}")
+            self.__logger.error(f"failed to open serial: {e}")
             pass
 
 
@@ -224,7 +220,7 @@ class SerialInterface:
                 message = message.strip()
                 self.message_queue.put(message)
             else: 
-                self._logger.info(f"Received incomplete message: {message}")
+                self.__logger.info(f"Received incomplete message: {message}")
 
             if "ABORT" in message:
                 with self.message_queue.mutex:
@@ -232,16 +228,16 @@ class SerialInterface:
                 self.message_queue.put(message)
 
         except:
-            self._logger.info(f"Failed to receive: {message}")
+            self.__logger.info(f"Failed to receive: {message}")
             return False
         
         return True
 
 
-    def build_message(self, data_type, data_label, data_value, source_tag=SOURCE_TAG) -> str:
+    def build_valve_message(self, data_type, data_label, data_value, source_tag=SOURCE_TAG) -> str:
         '''
         Name:
-            SerialInterface.build_message(source_tag="VC", data_type= DataTypes, data_label= DataLabels, data_value= DataValues) -> str
+            SerialInterface.build_valve_message(source_tag="VC", data_type= DataTypes, data_label= DataLabels, data_value= DataValues) -> str
         Args:
             source_tag: the source of the command
             data_type: the type of data
@@ -271,7 +267,7 @@ class SerialInterface:
             match message_array[1]:
                 case ResponseCommandType.SWITCH_STATE:
                     try:
-                        self.__logger.info(f"SET SWITCH STATE: {message_array[2]}, {message_array[2]}")
+                        self.___logger.info(f"SET SWITCH STATE: {message_array[2]}, {message_array[2]}")
                         # send to 
                         is_message_processed = True
                     except:
@@ -296,11 +292,11 @@ class SerialInterface:
                         pass
 
                     else:
-                        self.__logger.error(f"UNKNOWN STATUS: {message_array[2]}")
+                        self.___logger.error(f"UNKNOWN STATUS: {message_array[2]}")
             
                 case ResponseCommandType.SUMMARY:
                     try:
-                        self.__logger.info(f"SUMMARY: {message_array[2]}")
+                        self.___logger.info(f"SUMMARY: {message_array[2]}")
                         is_message_processed = True
                     except:
                         is_message_processed = False
@@ -317,8 +313,8 @@ class SerialInterface:
             Processes a summary command from the Mission Control
         '''
         if self._verbose:
-            self._logger.info("INFO", f"Received summary command: {message}")
+            self.__logger.info("INFO", f"Received summary command: {message}")
         for i in range(2, len(message), 2):
             self._conf[message[i]] = message[i + 1]
             if self._verbose:
-                self._logger.info(f"INFO {message[i]} {message[i + 1]}")
+                self.__logger.info(f"INFO {message[i]} {message[i + 1]}")

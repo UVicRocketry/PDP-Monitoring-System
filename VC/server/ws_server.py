@@ -88,7 +88,7 @@ class WebSocketServer:
                     message['valve'], 
                     message['action'])
 
-                command_message = self.__serial_interface.build_message(
+                command_message = self.__serial_interface.build_valve_message(
                     command.command, 
                     command.valve, 
                     command.action)

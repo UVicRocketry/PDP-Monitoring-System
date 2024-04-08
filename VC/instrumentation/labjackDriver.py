@@ -4,7 +4,7 @@ from datetime import datetime as dt
 from enum import Enum
 import u6
 import logging
-from instrumentation.InstrumentationLogPhrases import InstrumentationLogPhrases
+from .InstrumentationLogPhrases import InstrumentationLogPhrases
 import queue as Queue
 from copy import deepcopy
 import threading
