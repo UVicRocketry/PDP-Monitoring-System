@@ -1,14 +1,47 @@
 # Installation Guide
 
 ## Comms Setup
-The communication network of the system uses a websocket server over a local wifi network delivered by 2 TP-link CPE-710. Please check [comms setup](comms.md#setup) for more information.
+The communication network of the system uses a websocket server over a local wifi network delivered by 2 TP-link CPE-710. Please check [comms setup](comms.md#setup) for more information on how to setup the system.
 
 ## Server Installation
+
+Should be installed on the mini PC at the valve cart. For development purposes first clone this repository and install the dependencies. 
+
+```bash
+git clone https://github.com/UVicRocketry/PDP-Monitoring-System.git
+cd PDP-Monitoring-System
+pip install -r requirements.txt
+```
+
+You require python 3.11 (any version above should do) to run the server. If you don't have python 3.11.x go to the python website and download version 3.11.x. **Make sure to add python to your path.**
+
+you can now start the server by running the following command:
+
+```bash
+cd VC/ && python3 main.py
+```
 
 ## Client Installation
 [Ground Support Repository](https://github.com/UVicRocketry/Ground-Support)
 
+# Startup Guide
 
+First connect over ssh to the mini PC [ssh info](comms.md#ssh-credentials). you'll need two terminals one for client (Ground-Support) and the other for the server (PDP-Monitoring-System). Then navigate to `~/Documents/Github` directory.  
+
+In the first ssh terminal run the following commands to start the monitoring system:
+```bash
+cd /Documents/Github/
+sh start_cart.sh
+```
+
+In the first ssh terminal run the following commands to start the monitoring system:
+
+```bash
+cd /Documents/Github/
+sh start_valve.sh
+```
+
+The system is now running and can be accessed by connecting to the `UVR-PDP` network. The client can be accessed by going to `192.168.0.1:3000`.
 
 # Style Guide
 
