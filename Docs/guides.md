@@ -110,30 +110,104 @@ The system is now running and can be accessed by connecting to the `UVR-PDP` net
 
 ## Serial Interface
 
-A serial connection is used to communicate with both the controls system. The controls system uses a USB to connect to the arduino which starts stepper motors and solenoids which controls the valves. This document explains the commands that the arduino can receive and the response it will give and useful debugging strategies.
+A serial connection is used to communicate with both the controls system. The controls system uses a USB to connect to the arduino which starts stepper motors and solenoids which controls the valves. This section explains the commands that the arduino can receive and the response it will give and useful debugging strategies.
+
+You can find the api documentation [here](serial-api.md).
 
 ## Websocket Interface
+The websocket interface is used to communicate with the client. The client is a web service that displays the status of the valves and allows the user to control the valves. This section explains how to develop the websocket interface and how to test it.
+
+You can find the api documentation [here](ws-api.md).
 
 ## Testing Suite
 
 The testing framework has two types of tests, unit tests and feature tests. feature test are defined by a test case table and accomplish requirements tied with features. While unit tests, test integration points, and edge cases within the actual code. Test cases are either automated or physically done by the system. All unit tests are automated and done using the `unittest` built in python framework. 
 
-All tests are prioritized. The prioritizes are used to determine the $/zeta$ index, which is the percentage which a given test accomplishes it's feature. Simply put the $/zeta$ index is a weighted average that takes into account prioritizes. Please check the [testing legend]() for more details. 
+All tests are prioritized. The prioritizes are used to determine the $/zeta$ index, which is the percentage which a given test accomplishes it's feature. Simply put the $/zeta$ index is a weighted average that takes into account prioritizes. Please check the [testing legend]("Docs/test-case-legend.pdf") for more details. 
 
 You can run a testing suite through the following command. 
 
+One Test Suite
 ```bash
+python -m unittest tests/test_module.py
+```
 
+All the tests in the `tests` directory can be run using the following command. 
+```bash
+python -m unittest discover -s tests -p '*_test.py'
 ```
 
 You can compute the zeta index for a given test suite given that the `test-completion-matrix-1.#.csv` for the corresponding feature is defined. using the following labels.
 
 | Test Case ID | Priority type | Priority Importance |
+|--------------|---------------|---------------------|
 
-if you are unsure how how to name the labels check the [testing legend]().
+If you are unsure how how to name the labels check the [testing legend]("Docs/test-case-legend.pdf").
 
 To generate the zetas run 
 
 ```bash
 cd VC/tests && python feature_compeletion.py
+```
+### Automated Testing
+A Automated testing script which will generate all the zetas for and attach the results from a given test suite to the `test-completion-matrix-1.#.csv` can be used with the following command.
+
+TODO:
+```bash
+cd VC/tests && python automated_testing.py
+```
+
+### Creating A Feature Test Case
+
+To create a test first you need to create a test case table. The test case table should follow the [testing legend]("Docs/test-case-legend.pdf").
+
+Next create a corresponding `csv` file for the results of the test case. The `csv` file should be named `test-completion-matrix-1.#.csv` where `#` is the feature number.
+
+Next you need to create a test case in the `tests` directory. The test case should be named `test_module.py` where `module` is the module you are testing.
+
+Now you can write your test case. The test case should be a class that inherits from `unittest.TestCase`. Each test case should have a `setUp` method that initializes the test case and a `tearDown` method that cleans up after the test case. Each test case should have a `test` method that tests a specific feature of the module.
+
+```python
+import unittest
+
+class TestModule(unittest.TestCase):
+    def setUp(self):
+        # Initialize the test case.
+        pass
+
+    def tearDown(self):
+        # Clean up after the test case.
+        pass
+
+    def test_feature(self):
+        # Test a specific feature of the module.
+        pass
+```
+
+### Creating A Unit Test Case
+all you need is to add test case IDs to the `test-completion-matrix-1.#.csv` file.
+
+next you need to create a test case in the `tests` directory. The test case should be named `test_module.py` where `module` is the module you are testing.
+
+Add your unit test to the feature test case. 
+
+```python
+import unittest
+
+class TestModule(unittest.TestCase):
+    def setUp(self):
+        # Initialize the test case.
+        pass
+
+    def tearDown(self):
+        # Clean up after the test case.
+        pass
+
+    def test_feature(self):
+        # Test a specific feature of the module.
+        pass
+
+    def test_unit(self): <--- Add this
+        # Test a specific feature of the module.
+        pass
 ```
