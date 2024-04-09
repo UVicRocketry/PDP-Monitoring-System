@@ -116,3 +116,24 @@ A serial connection is used to communicate with both the controls system. The co
 
 ## Testing Suite
 
+The testing framework has two types of tests, unit tests and feature tests. feature test are defined by a test case table and accomplish requirements tied with features. While unit tests, test integration points, and edge cases within the actual code. Test cases are either automated or physically done by the system. All unit tests are automated and done using the `unittest` built in python framework. 
+
+All tests are prioritized. The prioritizes are used to determine the $/zeta$ index, which is the percentage which a given test accomplishes it's feature. Simply put the $/zeta$ index is a weighted average that takes into account prioritizes. Please check the [testing legend]() for more details. 
+
+You can run a testing suite through the following command. 
+
+```bash
+
+```
+
+You can compute the zeta index for a given test suite given that the `test-completion-matrix-1.#.csv` for the corresponding feature is defined. using the following labels.
+
+| Test Case ID | Priority type | Priority Importance |
+
+if you are unsure how how to name the labels check the [testing legend]().
+
+To generate the zetas run 
+
+```bash
+cd VC/tests && python feature_compeletion.py
+```
