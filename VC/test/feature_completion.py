@@ -18,9 +18,9 @@ You must have a file named test-case-completion-matrix-1.{num}.csv where num is 
 
 '''
 
+import sys 
 import numpy as np
 import pandas as pd
-import sys 
 
 class TestFeatureCompletion():
     '''
@@ -42,6 +42,12 @@ class TestFeatureCompletion():
         if self.__rhos.shape != self.__taus.shape:
             raise ValueError("The size of rhos and taus must be the same column size")
         
+        if np.logical_and(self.__rhos > 0, self.__rhos < 4).any():
+            raise ValueError("\nThe Test Importance (rho) must be range 0-4. See test legend for more information.")
+        
+        if np.logical_and(self.__taus > 1, self.__taus < 2).any():
+            raise ValueError("\nThe Test Type (tau) must be range 1-2. See test legend for more information.")
+
         if not all(isinstance(rho, int) for rho in self.__rhos):
             raise ValueError("The elements of rhos must be integers")
         
