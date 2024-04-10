@@ -90,6 +90,23 @@ if len(sys.argv) > 1:
             test_case_numbers.append(int(arg))
         if arg == "--filenumber" or arg == "-f":
             flag = True
+        if arg == "--help" or arg == "-h":
+            print(
+"""\nThis script is used to compute the feature completion of a test case or suite of tests. 
+To run the script, you must have the following files in the same directory as this file:
+
+You must have a file named test-case-completion-matrix-1.{num}.csv where num is the number of the test case. 
+This file must have the following columns:
+
+- Test Case ID  (str)
+- Priority type (int 1-2)
+- Priority importance (int 0-4)
+
+for more information on the priority type and importance, please see the test legend in the documentation.
+
+example input: `python feature_completion.py -f 1 2` where test-case-completion-matrix-1.csv and test-case-completion-matrix-2.csv exist in the same directory as this script.
+""")
+            sys.exit(0)
         
 else:
     raise ValueError("You must provide the input file numbers after a --filenumber or -f flag.\nexample input: `python feature_completion.py -f 1 2` where test-case-completion-matrix-1.csv and test-case-completion-matrix-2.csv exist in the same directory as this script.")
