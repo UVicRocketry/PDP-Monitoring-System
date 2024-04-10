@@ -6,7 +6,11 @@ This repository contains the server for used on valve cart. The server runs off 
 
 # Table of Contents
 
-## [1. Installation Guide](Docs/guides.md#installation-guide)
+## [1. Guides](Docs/guides.md)
+### [1.1 Installation Guides](Docs/guides.md#installation-guide)
+### [1.2 StartUp Guides](Docs/guides.md#startup-guide)
+### [1.3 Style Guides](Docs/guides.md#style-guide)
+### [1.4 Developer Guides](Docs/guides.md#developer-guide)
 ## [2. Serial Interface](Docs/serial-api.md#serial-interface)
 ### [2.1 Command Structure](Docs/serial-api.md#command-structure)
 #### [2.2 Source Tags](Docs/serial-api.md#source-tags)

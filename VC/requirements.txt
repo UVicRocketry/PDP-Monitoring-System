@@ -3,3 +3,5 @@ LabJackPython
 pyserial
 logbook
 mock_serial
+numpy
+pandas 
