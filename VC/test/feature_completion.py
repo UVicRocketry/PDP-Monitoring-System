@@ -35,17 +35,17 @@ class TestFeatureCompletion():
         where rho is the priority type of the test case, tau is the priority importance of the test case and T is the sum of the product of rho and tau. $\zeta$ then equates to a weighted sum of actual how much a test completes a feature. 
     '''
     def __init__(self, rho: list[int] | int, tau: list[int] | int, id: list[str] | str) -> None:
-        self.__rhos: np.array[int] | int = np.array(rhos) if isinstance(rhos, list) else rho
-        self.__taus: np.array[int] | int = np.array(taus) if isinstance(taus, list) else tau
+        self.__rhos: np.array[int] | int = np.array(rho) if isinstance(rho, list) else rho
+        self.__taus: np.array[int] | int = np.array(tau) if isinstance(tau, list) else tau
         self.zetas: np.array[float] | float = None
 
         if self.__rhos.shape != self.__taus.shape:
             raise ValueError("The size of rhos and taus must be the same column size")
         
-        if np.logical_and(self.__rhos > 0, self.__rhos < 4).any():
+        if not np.logical_and(self.__rhos >= 0, self.__rhos <= 4).any():
             raise ValueError("\nThe Test Importance (rho) must be range 0-4. See test legend for more information.")
         
-        if np.logical_and(self.__taus > 1, self.__taus < 2).any():
+        if not np.logical_and(self.__taus >= 1, self.__taus <= 2).any():
             raise ValueError("\nThe Test Type (tau) must be range 1-2. See test legend for more information.")
 
         if not all(isinstance(rho, int) for rho in self.__rhos):
@@ -74,7 +74,7 @@ class TestFeatureCompletion():
             Computes the zeta index
         '''
         T = np.sum(self.__rhos * self.__taus)
-        return round((((self.__rhos * self.__taus) / T)*100), 2)
+        return (((self.__rhos * self.__taus) / T)*100)
     
     @property
     def __is_equal_to_100(self) -> bool:
@@ -92,7 +92,7 @@ if len(sys.argv) > 1:
             flag = True
         
 else:
-    raise ValueError("You must provide the input file numbers after a --filenumber or -f flag")
+    raise ValueError("You must provide the input file numbers after a --filenumber or -f flag.\nexample input: `python feature_completion.py -f 1 2` where test-case-completion-matrix-1.csv and test-case-completion-matrix-2.csv exist in the same directory as this script.")
 
 ids: list[str] = None
 rhos: list[int] = None
