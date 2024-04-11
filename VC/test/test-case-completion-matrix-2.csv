@@ -1,0 +1,4 @@
+Test Case ID,Priority type,Priority importance,T,Results,P/F,zeta
+TC-COMM-005,2,3,14.0,,,37.5
+TC-COMM-006,2,2,,,,25.0
+TC-COMM-007,2,3,,,,37.5

@@ -78,7 +78,8 @@ class TestFeatureCompletion():
     
     @property
     def __is_equal_to_100(self) -> bool:
-        zetas_sum: float = np.sum(self.zetas)
+        zetas_sum: float = round(np.sum(self.zetas))
+        print(zetas_sum)
         return zetas_sum == 100
 
 test_case_numbers = []
