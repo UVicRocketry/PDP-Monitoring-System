@@ -66,16 +66,16 @@ class LabJackU6Driver:
 
     def choose_mode(self, command):
         if command == InstrumentationCommand.STATUS:
-            self.__logger.info(InstrumentationLogPhrases.STARTING_STATUS_MODE)
+            #self.__logger.info(InstrumentationLogPhrases.STARTING_STATUS_MODE)
             self.__status()
         elif command == InstrumentationCommand.RESET_SENSOR:
-            self.__logger.info(InstrumentationLogPhrases.STARTING_RESET_SENSOR_MODE)
+            #self.__logger.info(InstrumentationLogPhrases.STARTING_RESET_SENSOR_MODE)
             self.__reset_sensor()
         elif command == InstrumentationCommand.STREAM_SENSORS:
-            self.__logger.info(InstrumentationLogPhrases.STARTING_SAMPLE_SENSORS_MODE)
+            #self.__logger.info(InstrumentationLogPhrases.STARTING_SAMPLE_SENSORS_MODE)
             self.__stream()
         elif command == InstrumentationCommand.SAMPLE_SENSORS:
-            self.__logger.info(InstrumentationLogPhrases.STARTING_SAMPLE_SENSORS_MODE)
+            #self.__logger.info(InstrumentationLogPhrases.STARTING_SAMPLE_SENSORS_MODE)
             self.__sample_sensors()
 
 
@@ -124,10 +124,10 @@ class LabJackU6Driver:
                 print(f"Output Voltage: {output_voltage}")
             except Queue.Empty:
                 if self._finished:
-                    self.__logger.info(InstrumentationLogPhrases.STREAMING_FINISHED)
+                    #self.__logger.info(InstrumentationLogPhrases.STREAMING_FINISHED)
                     break
                 else:
-                    self.__logger.info(InstrumentationLogPhrases.QUEUE_EMPTY_ENDING_STREAM)
+                    #self.__logger.info(InstrumentationLogPhrases.QUEUE_EMPTY_ENDING_STREAM)
                     self._finished = True
                 pass
             except Exception as e:
@@ -154,7 +154,7 @@ class LabJackU6Driver:
                 returnDict = next(self.__d.streamData(convert=False))
 
                 if returnDict is None:
-                    self.__logger.error(InstrumentationLogPhrases.FAILED_TO_STREAM)
+                    #self.__logger.error(InstrumentationLogPhrases.FAILED_TO_STREAM)
                     continue
 
                 self.data.put_nowait(deepcopy(returnDict))

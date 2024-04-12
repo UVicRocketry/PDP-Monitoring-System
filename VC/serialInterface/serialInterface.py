@@ -60,8 +60,8 @@ class SerialInterface:
         # lists all possible com ports
         self.__possible_ports = None
         self.__port = None 
-        self._stream = None
-        self.__init_stream()
+        self.stream = None
+        self.__initstream()
 
         self._connected = False
         self._status="DCONN"
@@ -94,17 +94,17 @@ class SerialInterface:
         self.__logger.info("Serial Logger configured")
 
 
-    def __init_stream(self):
+    def __initstream(self):
         '''
         Name:
-            SerialInterface._init_stream() -> None
+            SerialInterface._initstream() -> None
         Desc:
             Initializes the serial port and sets the connection status
         '''
         try:
             print("OS: ", OS)
             self.__port = 'COM6' if str(OS) == 'Windows' else '/dev/ttyACM0' # update this to the correct port for the VC mini PC
-            self._stream = serial.Serial(port=self.__port, baudrate=115200, timeout=0.1)
+            self.stream = serial.Serial(port=self.__port, baudrate=115200, timeout=0.1)
             self.__logger.info(f"Opened serial port: {self.__port}")
         except Exception as e:
             self.__logger.error(f"failed to open serial: {e}")
@@ -145,7 +145,7 @@ class SerialInterface:
             True if there is a message pending, False otherwise
         '''
         try:
-            if self._stream.in_waiting > 0:
+            if self.stream.in_waiting > 0:
                 return True
             else:
                 return False
@@ -163,7 +163,7 @@ class SerialInterface:
             True if the port was closed successfully, False otherwise
         '''
         try: 
-            self._stream.close()
+            self.stream.close()
             self._connected = False
             return True
         except:
@@ -195,7 +195,7 @@ class SerialInterface:
         Desc: Sends a message to the serial port
         '''
         try: 
-            self._stream.write(message.encode())
+            self.stream.write(message.encode())
             if self._verbose:
                 pass
             return True
@@ -215,7 +215,7 @@ class SerialInterface:
         '''
         message = ""
         try:
-            message = message + self._stream.readline().decode()
+            message = message + self.stream.readline().decode()
             if message.endswith("\n"):
                 message = message.strip()
                 self.message_queue.put(message)

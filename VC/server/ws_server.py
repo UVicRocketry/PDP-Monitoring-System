@@ -14,7 +14,7 @@ class Command:
         self.action = action
 
 class WebSocketServer:
-    def __init__(self, host="localhost", port=8888):
+    def __init__(self, host="192.168.0.1", port=8888):
         self.__host = host
         self.__port = port
 
@@ -34,7 +34,7 @@ class WebSocketServer:
             pass
 
         try:
-            self.__labjack = LabJackU6Driver()
+            # self.__labjack = LabJackU6Driver()
             self.__logger.info("Labjack Driver initialized\n")
         except Exception as e:
             self.__logger.error(f"Failed to initailize labjack: {e}\n", exc_info=True)
@@ -64,8 +64,17 @@ class WebSocketServer:
         Desc:
             Handles the websocket connection
         '''
-        async for message in websocket:
-            await self._handle_message(websocket, message)
+        while True:
+            await self.__stream_reciever()
+            await asyncio.sleep(0)
+            async for message in websocket:
+                await self._handle_message(websocket, message)
+
+
+    async def __stream_reciever(self):
+        message = self.__serial_interface.stream.readline().decode()
+        print(message)
+        self.__logger.info(f"Valve Cart Raw Feedback: {message}")
 
 
     async def _handle_message(self, websocket, message):
