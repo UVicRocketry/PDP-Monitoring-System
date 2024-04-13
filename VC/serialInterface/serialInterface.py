@@ -210,25 +210,19 @@ class SerialInterface:
         Returns:
             True if the message was received successfully, False otherwise
         '''
-        message = ""
-        try:
-            message = self.stream.readline().decode()
-            if message.endswith("\n"):
-                message = message.strip()
-                self.__message_queue.put(message)
-                self.__logger.info(f"VC Raw message received: {message}")
-            else: 
-                self.__logger.info(f"VC Raw incomplete message: {message}")
-
-            if "ABORT" in message:
-                with self.__message_queue.mutex:
-                        self.__message_queue.queue.clear()
-                self.__message_queue.put(message)
-
-        except:
-            self.__logger.info(f"Failed to receive: {message}")
-            return "ERROR"
-        
+        message = self.stream.readline()
+        self.__logger.info(f"VC Raw message received: {message}")
+        print(message)
+        feedback = self.stream.readline().decode()
+        if "\n'" in feedback:
+            print("conatians /\n/")
+        # if str(message).endswith("\n"):
+        #     message = message.strip()
+        #     self.__message_queue.put(message)
+        #     self.__logger.info(f"VC Raw message received: {message}")
+        # else: 
+        #     self.__logger.info(f"VC Raw incomplete message: {message}")
+    
         return message
 
 
