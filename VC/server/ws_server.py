@@ -4,8 +4,14 @@ import json
 from serialInterface.serialInterface import SerialInterface
 from instrumentation.labjackDriver import LabJackU6Driver
 import logging
+import platform
 
 __name__ = "WebSocketServer"
+
+OS = platform.system()
+
+HOST = "192.168.0.1" if OS == "Linux" else "localhost"
+PORT = 8888
 
 class Command:
     def __init__(self, command, valve, action):
@@ -14,7 +20,7 @@ class Command:
         self.action = action
 
 class WebSocketServer:
-    def __init__(self, host="192.168.0.1", port=8888):
+    def __init__(self, host=HOST, port=PORT):
         self.__host = host
         self.__port = port
 
@@ -26,6 +32,10 @@ class WebSocketServer:
         self.__serial_interface = None
         self.__labjack = None
 
+        self.__feedback_reception_task = None
+        self.__labjack_task = None
+        self.__ws_reception_task = None
+
         try:
             self.__serial_interface = SerialInterface()
             self.__logger.info("Serial interface initialized\n")
@@ -35,9 +45,25 @@ class WebSocketServer:
 
         try:
             # self.__labjack = LabJackU6Driver()
+            # self.__labjack_task = asyncio.create_task(self.__labjack.start())
             self.__logger.info("Labjack Driver initialized\n")
         except Exception as e:
             self.__logger.error(f"Failed to initailize labjack: {e}\n", exc_info=True)
+
+
+    def __setup_coroutines(self, websocket):
+        '''
+        Name:
+            WebSocketServer.__setup_coroutines(websocket= websockets.WebSocketServerProtocol) -> None
+        Args:
+            websocket: the websocket connection
+        Desc:
+            Sets up the coroutines for the websocket
+        '''
+        self.__feedback_reception_task = asyncio.create_task(self.__stream_receiver(websocket))
+        self.__logger.info("Serial coroutine initialized\n")
+        self.__ws_reception_task = asyncio.create_task(self.__stream_sending_handler(websocket))
+        self.__logger.info("WS coroutine initialized\n")
 
 
     def __configure_log(self):
@@ -55,26 +81,56 @@ class WebSocketServer:
         self.__logger.info("WS Logger configured\n")
 
 
-    async def _handler(self, websocket):
+    async def __handler(self, websocket):
         ''' 
         Name:
-            WebSocketServer._handler(websocket=websockets.WebSocketServerProtocol, path= str) -> None
+            WebSocketServer.__handler(websocket=websockets.WebSocketServerProtocol, path= str) -> None
         Args:
             websocket: the websocket connection
         Desc:
-            Handles the websocket connection
+            Handles the websocket requests and serial receiving
         '''
+        self.__setup_coroutines(websocket)
+
         while True:
-            await self.__stream_reciever()
+            await self.__feedback_reception_task
             await asyncio.sleep(0)
-            async for message in websocket:
-                await self._handle_message(websocket, message)
+            await self.__ws_reception_task
 
 
-    async def __stream_reciever(self):
-        message = self.__serial_interface.stream.readline().decode()
-        print(message)
-        self.__logger.info(f"Valve Cart Raw Feedback: {message}")
+    async def __stream_sending_handler(self, websocket):
+        '''
+        Name:
+            WebSocketServer.__stream_sending_handler(websocket=websockets.WebSocketServerProtocol) -> None
+        Args:
+            websocket: the websocket connection
+        Desc:
+            Handles the sending of the stream
+        '''
+        async for message in websocket:
+            await self._handle_message(websocket, message)
+
+
+    async def __stream_receiver(self):
+        if self.__serial_interface is None:
+            return
+        if self.__serial_interface.message_pending:
+            message = self.__serial_interface.stream.receive()
+            feedback = self.__feedback_builder(message)
+            print(feedback)
+            self.__logger.info(f"Valve Cart Raw Feedback: {message}")
+
+
+    async def __feedback_builder(self, message):
+        '''
+        Name:
+            WebSocketServer.__feedback_builder(message= str) -> str
+        Args:
+            message: the message to build
+        Desc:
+            Builds the feedback message
+        '''
+        return json.dumps({'identifier': 'FEEDBACK', 'data': message})
 
 
     async def _handle_message(self, websocket, message):
@@ -139,5 +195,5 @@ class WebSocketServer:
         Desc:
             Starts the websocket server
         '''
-        async with websockets.serve(self._handler, self.__host, self.__port):
+        async with websockets.serve(self.__handler, self.__host, self.__port):
             await asyncio.Future()

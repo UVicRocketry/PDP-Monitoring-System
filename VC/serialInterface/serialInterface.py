@@ -49,19 +49,16 @@ class SerialInterface:
 
     """
     def __init__(self):
-        self._message_queue = queue.Queue()
-        self._control_queue = queue.Queue()
-        self._verbose=False
+        self.__message_queue = queue.Queue()
 
         self.__logger = logging.getLogger(__name__)
         self.__log_handler = None
         self.__configure_log()
 
         # lists all possible com ports
-        self.__possible_ports = None
         self.__port = None 
         self.stream = None
-        self.__initstream()
+        self.__init_stream()
 
         self._connected = False
         self._status="DCONN"
@@ -94,7 +91,7 @@ class SerialInterface:
         self.__logger.info("Serial Logger configured")
 
 
-    def __initstream(self):
+    def __init_stream(self):
         '''
         Name:
             SerialInterface._initstream() -> None
@@ -108,7 +105,7 @@ class SerialInterface:
             self.__logger.info(f"Opened serial port: {self.__port}")
         except Exception as e:
             self.__logger.error(f"failed to open serial: {e}")
-            pass
+            raise e
 
 
     def init_connection(self):
@@ -120,11 +117,11 @@ class SerialInterface:
         '''
         while True:
             self._send("MCC,CONNECT,")
-            with self.message_queue.mutex:
-                self.message_queue.queue.clear()
+            with self.__message_queue.mutex:
+                self.__message_queue.queue.clear()
 
             try:
-                config_message = self.message_queue.get(timeout=3)
+                config_message = self.__message_queue.get(timeout=3)
                 if ",STATUS,ESTABLISH" in config_message:
                     self._connected = True
                     self._status = "CONN"
@@ -178,8 +175,8 @@ class SerialInterface:
             Sends an abort signal to the MCC
         '''
 
-        with self.message_queue.mutex:
-            self.message_queue.queue.clear()
+        with self.__message_queue.mutex:
+            self.__message_queue.queue.clear()
         self._send("MCC,ABORT,")
 
 
@@ -203,7 +200,7 @@ class SerialInterface:
             return False
      
 
-    def _receive(self) -> bool:
+    def receive(self) -> str:
         '''
         Name: 
             SerialInterface._receive() -> bool
@@ -215,23 +212,24 @@ class SerialInterface:
         '''
         message = ""
         try:
-            message = message + self.stream.readline().decode()
+            message = self.stream.readline().decode()
             if message.endswith("\n"):
                 message = message.strip()
-                self.message_queue.put(message)
+                self.__message_queue.put(message)
+                self.__logger.info(f"VC Raw message received: {message}")
             else: 
-                self.__logger.info(f"Received incomplete message: {message}")
+                self.__logger.info(f"VC Raw incomplete message: {message}")
 
             if "ABORT" in message:
-                with self.message_queue.mutex:
-                        self.message_queue.queue.clear()
-                self.message_queue.put(message)
+                with self.__message_queue.mutex:
+                        self.__message_queue.queue.clear()
+                self.__message_queue.put(message)
 
         except:
             self.__logger.info(f"Failed to receive: {message}")
-            return False
+            return "ERROR"
         
-        return True
+        return message
 
 
     def build_valve_message(self, data_type, data_label, data_value, source_tag=SOURCE_TAG) -> str:
