@@ -1,10 +1,10 @@
 # reference https://github.com/UVicRocketry/Hybrid-Controls-System/blob/33-comms-prot-fixing/src/MCC_GUI/comm.py
 import serial
-import queue
 import logging
 from enum import Enum
 from .serialCommandTypes import Valves, DataTypes, DataLabels, DataValues, SOURCE_TAG
 import platform
+import asyncio
 
 __name__ = "SerialInterface"
 
@@ -44,12 +44,9 @@ class SerialInterface:
         close: closes the serial port
         send: sends a message
         build_valve_message: builds a message
-        process_command: processes a command
-        _process_summary_command: processes a summary command
-
+        __process_command: processes a command
     """
-    def __init__(self):
-        self.__message_queue = queue.Queue()
+    def __init__(self, from_wss_queue, to_wss_queue):
 
         self.__logger = logging.getLogger(__name__)
         self.__log_handler = None
@@ -60,8 +57,10 @@ class SerialInterface:
         self.stream = None
         self.__init_stream()
 
+        self.from_wss_queue = from_wss_queue
+        self.to_wss_queue = to_wss_queue
+
         self._connected = False
-        self._status="DCONN"
 
         self.valves = [
             Valves.N2OF,
@@ -108,29 +107,6 @@ class SerialInterface:
             raise e
 
 
-    def init_connection(self):
-        '''
-        Name:
-            SerialInterface.init_connection() -> None
-        Desc:
-            Initializes the connection to the Mission Control
-        '''
-        while True:
-            self._send("MCC,CONNECT,")
-            with self.__message_queue.mutex:
-                self.__message_queue.queue.clear()
-
-            try:
-                config_message = self.__message_queue.get(timeout=3)
-                if ",STATUS,ESTABLISH" in config_message:
-                    self._connected = True
-                    self._status = "CONN"
-                    break 
-            except queue.Empty:
-                self._status = "ERR"
-                break
-
-
     @property
     def message_pending(self) -> bool:
         '''
@@ -174,13 +150,12 @@ class SerialInterface:
         Desc:
             Sends an abort signal to the MCC
         '''
-
         with self.__message_queue.mutex:
             self.__message_queue.queue.clear()
-        self._send("MCC,ABORT,")
+        self.__send("MCC,ABORT,")
 
 
-    def send(self, message) -> bool:
+    def __send(self, message) -> bool:
         '''
         Name: 
             SerialInterface._send(message= str) -> bool
@@ -193,8 +168,6 @@ class SerialInterface:
         '''
         try: 
             self.stream.write(message.encode())
-            if self._verbose:
-                pass
             return True
         except:
             return False
@@ -214,16 +187,40 @@ class SerialInterface:
         self.__logger.info(f"VC Raw message received: {message}")
         print(message)
         feedback = self.stream.readline().decode()
-        if "\n'" in feedback:
-            print("conatians /\n/")
-        # if str(message).endswith("\n"):
-        #     message = message.strip()
-        #     self.__message_queue.put(message)
-        #     self.__logger.info(f"VC Raw message received: {message}")
-        # else: 
-        #     self.__logger.info(f"VC Raw incomplete message: {message}")
+        # if "\n'" in feedback:
+        #     print("contains /\n/")
     
         return message
+    
+    async def receive_loop(self, queue: asyncio.LifoQueue):
+        '''
+        Name:
+            SerialInterface.receive_loop() -> None
+        Desc:
+            The main loop for receiving messages
+        '''
+        while True:
+            if self.message_pending:
+                message = self.receive()
+                print(f"[Serial] Received message: {message}")
+                if message:
+                    self.__process_command(message)
+            await asyncio.sleep(0.1)
+
+    async def send_async(self, queue: asyncio.LifoQueue):
+        '''
+        Name:
+            SerialInterface.send_async() -> None
+        Desc:
+            The main loop for sending messages
+        '''
+        while True:
+            if not queue.empty():
+                message = queue.get()
+                print(f"[]Serial] Sending message: {message}")
+                # command = self.build_valve_message(message['data_type'], message['data_label'], message['data_value'])
+                # self.__send(command)
+            await asyncio.sleep(0.1)
 
 
     def build_valve_message(self, data_type, data_label, data_value, source_tag=SOURCE_TAG) -> str:
@@ -244,10 +241,10 @@ class SerialInterface:
         return f"VC,{data_type},{data_label},{data_value}\n"
 
 
-    def process_command(self, message):
+    def __process_command(self, message):
         '''
         Name:
-            SerialInterface.process_command(message= str) -> None
+            SerialInterface.__process_command(message= str) -> None
         Args:
             message: the message to process
         Desc:
@@ -293,20 +290,3 @@ class SerialInterface:
                     except:
                         is_message_processed = False
                     return is_message_processed
-
-
-    def _process_summary_command(self, message):
-        '''
-        Name:
-            SerialInterface._process_summary_command(message= str) -> None
-        Args:
-            message: the message to process
-        Desc:
-            Processes a summary command from the Mission Control
-        '''
-        if self._verbose:
-            self.__logger.info("INFO", f"Received summary command: {message}")
-        for i in range(2, len(message), 2):
-            self._conf[message[i]] = message[i + 1]
-            if self._verbose:
-                self.__logger.info(f"INFO {message[i]} {message[i + 1]}")
