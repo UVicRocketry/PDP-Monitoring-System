@@ -48,7 +48,7 @@ class SerialInterface:
         build_valve_message: builds a message
         __process_command: processes a command
     """
-    def __init__(self, from_wss_queue, to_wss_queue):
+    def __init__(self):
 
         self.__logger = logging.getLogger(__name__)
         self.__log_handler = None
@@ -59,22 +59,17 @@ class SerialInterface:
         self.stream = None
         self.__init_stream()
 
-        self.from_wss_queue = from_wss_queue
-        self.to_wss_queue = to_wss_queue
-
         self._connected = False
 
-        self.valves = [
-            Valves.N2OF,
-            Valves.N2OV,
-            Valves.N2F,
-            Valves.RTV,
-            Valves.NCV,
-            Valves.EVV,
-            Valves.IGPRIME,
-            Valves.IGFIRE,
-            Valves.MEV
-        ]
+        self.__valve_state = {
+            Valves.MEV: DataValues.CLOSED,
+            Valves.N2OF: DataValues.CLOSED,
+            Valves.N2OV: DataValues.CLOSED,
+            Valves.N2F: DataValues.CLOSED,
+            Valves.RTV: DataValues.CLOSED,
+            Valves.NCV: DataValues.CLOSED,
+            Valves.ERV: DataValues.CLOSED,  
+        }
 
 
     def __configure_log(self):
@@ -247,7 +242,7 @@ class SerialInterface:
         return f"VC,{data_type},{data_label},{data_value}\n"
 
 
-    def __process_command(self, message):
+    def __process_incoming_command(self, message):
         '''
         Name:
             SerialInterface.__process_command(message= str) -> None
@@ -257,25 +252,24 @@ class SerialInterface:
             Processes a message from the MCC
         '''
         is_message_processed = False
-        if message in ',':
-            message_array = message.split(',')
+        if message.endswith('\n'):
+            message_array = message.strip().split(',')
             match message_array[1]:
                 case ResponseCommandType.SWITCH_STATE:
                     try:
-                        self.___logger.info(f"SET SWITCH STATE: {message_array[2]}, {message_array[2]}")
+                        self.__logger.info(f"SET SWITCH STATE: {message_array[2]}, {message_array[2]}")
                         # send to 
                         is_message_processed = True
                     except:
                         is_message_processed = False
                     return is_message_processed
-                
                 case ResponseCommandType.STATUS:
 
                     if message_array[2] == ResponseCommandType.START_UP:
                         pass
                     
                     elif message_array[2] == ResponseCommandType.DISARMED:
-                        pass
+                        pass 
 
                     elif message_array[2] == ResponseCommandType.ARMED:
                         pass
@@ -290,9 +284,18 @@ class SerialInterface:
                         self.___logger.error(f"UNKNOWN STATUS: {message_array[2]}")
             
                 case ResponseCommandType.SUMMARY:
-                    try:
-                        self.___logger.info(f"SUMMARY: {message_array[2]}")
+                    for i in range(2, len(message_array)):
+                        valve = message_array[i]
+                        action = message_array[i + 1]
+                        if self.__valve_state[valve] != action:
+                            self.__valve_state[valve] = action
+                            command = {
+                                'identifier': 'CONTROLS',
+                                'command': 'FEEDBACK',
+                                'valve': valve,
+                                'action': action   
+                            }
+                            print(command)
+                            self.__logger.info(f"=Feedback: {valve} is {action}")
                         is_message_processed = True
-                    except:
-                        is_message_processed = False
-                    return is_message_processed
+
