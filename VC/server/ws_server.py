@@ -27,15 +27,15 @@ class VCFeedback:
 
 
 class WebSocketServer:
-    def __init__(self, to_serial_queue, from_serial_queue):
+    def __init__(self):
         self.__host = HOST
         self.__port = PORT
+        self.__wss_instance = None
 
         self.__logger = logging.getLogger(__name__)
         self.__log_handler = None
 
-        self.from_serial_queue = from_serial_queue
-        self.to_serial_queue = to_serial_queue
+        self.__incomming_queue = asyncio.LifoQueue()
         self.__configure_log()
 
 
@@ -63,18 +63,28 @@ class WebSocketServer:
         Desc:
             Handles the websocket requests and serial feedback to send over the websocket
         '''
-        # receive messages from the websocket
-        await self.__wss_reception_handler(websocket)
-        # send serial feedback over the websocket
-        await self.__serial_feedback_wss_handler(websocket)
+        self.__wss_instance = websocket
+        await self.__wss_instance.send(json.dumps({"identifier": "STARTUP", "data": "VC CONNECTED"}))
+        # websocket.send(Json.dumps({"identifer": "STARTUP", "data": "VC CONNECTED"}))
 
-    async def __wss_reception_handler(self, websocket):
         async for message in websocket:
-            await self.__handle_receive_message(websocket, message)
+            print(message)
+            await self.__incomming_queue.put(message)
+            # receive messages from the websocket
             await asyncio.sleep(0)
 
+    async def wss_reception_handler(self, queue):
+        # if not self.__incomming_queue.empty():
+        print("\nnot empty\n")
+        message = await self.__incomming_queue.get()
+        self.__handle_receive_message(message)
+        await queue.put(message)
+        # else:
+        #     print("empty")
+        await asyncio.sleep(0)
+
     
-    async def __serial_feedback_wss_handler(self, websocket):
+    async def serial_feedback_wss_handler(self, queue):
         '''
         Name:
             WebSocketServer.__serial_feedback_wss_handler(websocket= websockets.WebSocketServerProtocol) -> None
@@ -85,19 +95,24 @@ class WebSocketServer:
         '''
         while True:
             feedback = None
+            if self.__wss_instance is not None:
+                try:
+                    # Try to get feedback from the serial queue. if none available then continue to the next iteration
+                    feedback = await queue.get() 
+                    print(f"[WSS] recieved from queue: {feedback}")
+            
+                    await self.__wss_instance.send(json.dumps({
+                        "identifier": "FEEDBACK",
+                        "data": feedback
+                    }))
 
-            try:
-                # Try to get feedback from the serial queue. if none available then continue to the next iteration
-                feedback = await self.serial_feedback_queue.get_nowait() 
-            except asyncio.QueueEmpty:
-                await asyncio.sleep(0)
-                return
-        
-            print(feedback)
-            # feedback_message = self.__feedback_builder(feedback)
-            # await self.send_message(websocket, feedback_message)
-            self.serial_queue_out.task_done()
+                except asyncio.QueueEmpty:
+                    await asyncio.sleep(0)
+                    return
+                
+                queue.task_done()
             await asyncio.sleep(0)
+
 
 
     def __feedback_builder(self, message):
@@ -109,11 +124,12 @@ class WebSocketServer:
         Desc:
             Builds the feedback message
         '''
-        command = VCFeedback(message['valve'], message['action'])
+        # command = VCFeedback(message['valve'], message['action'])
+        print(f"\n{message}\n")
         return json.dumps(command.__dict__)
 
 
-    async def __handle_receive_message(self, websocket, message):
+    async def __handle_receive_message(self, message):
         '''
         Name:
             WebSocketServer.__handle_receive_message(websocket=websockets.WebSocketServerProtocol, message= str) -> None
@@ -127,9 +143,9 @@ class WebSocketServer:
         print(message)
         message_identifier = message['identifier'] if 'identifier' in message else None
 
-        if 'ABORT' in message['command'] and 'command' in message:
-            self.__serial_interface.send("VC,ABORT\n")
-            return
+        # if 'ABORT' in message['command'] and 'command' in message:
+        #     self.__serial_interface.send("VC,ABORT\n")
+        #     return
         
         match message_identifier:
             case 'CONTROLS':
@@ -137,16 +153,9 @@ class WebSocketServer:
                     message['command'], 
                     message['valve'], 
                     message['action'])
-
-                command_message = self.__serial_interface.build_valve_message(
-                    command.command, 
-                    command.valve, 
-                    command.action)
+                self.__logger.info(f"SENDING COMMAND: {command}\n")
+                return command
                 
-                self.__logger.info(f"SENDING COMMAND: {command_message}\n")
-
-                # update serial out queue
-
             case 'CONFIGURATION':
                 pass
             case 'INSTRUMENTATION':
@@ -156,7 +165,7 @@ class WebSocketServer:
                 pass
 
     
-    async def send_message(self, websocket, message):
+    async def send_message(self, message):
         '''
         Name:
             WebSocketServer.send_message(websocket= websockets.WebSocketServerProtocol, message= str) -> None
@@ -166,7 +175,7 @@ class WebSocketServer:
         Desc:
             Sends a message to the mission control
         '''
-        await websocket.send(message)
+        await self.__wss_instance.send(message)
 
 
     async def start(self):

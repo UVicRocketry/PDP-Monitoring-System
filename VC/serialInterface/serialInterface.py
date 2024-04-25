@@ -5,6 +5,8 @@ from enum import Enum
 from .serialCommandTypes import Valves, DataTypes, DataLabels, DataValues, SOURCE_TAG
 import platform
 import asyncio
+import json
+
 
 __name__ = "SerialInterface"
 
@@ -183,10 +185,8 @@ class SerialInterface:
         Returns:
             True if the message was received successfully, False otherwise
         '''
-        message = self.stream.readline()
+        message = self.stream.readline().decode()
         self.__logger.info(f"VC Raw message received: {message}")
-        print(message)
-        feedback = self.stream.readline().decode()
         # if "\n'" in feedback:
         #     print("contains /\n/")
     
@@ -203,8 +203,9 @@ class SerialInterface:
             if self.message_pending:
                 message = self.receive()
                 print(f"[Serial] Received message: {message}")
-                if message:
-                    self.__process_command(message)
+                await queue.put(message)
+                # if message:
+                #     self.__process_command(message)
             await asyncio.sleep(0.1)
 
     async def send_async(self, queue: asyncio.LifoQueue):
@@ -216,10 +217,15 @@ class SerialInterface:
         '''
         while True:
             if not queue.empty():
-                message = queue.get()
-                print(f"[]Serial] Sending message: {message}")
-                # command = self.build_valve_message(message['data_type'], message['data_label'], message['data_value'])
-                # self.__send(command)
+                message = await queue.get()
+                print(f"\n[Serial] Sending message: {message}\n")
+                message_object = json.loads(message)
+                if "command" in message_object: 
+                    command = self.build_valve_message(
+                        message_object['command'], 
+                        message_object['valve'], 
+                        message_object['action'])
+                    self.__send(command)
             await asyncio.sleep(0.1)
 
 
