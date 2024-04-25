@@ -16,7 +16,7 @@ def main() -> None:
     serial_command_queue = asyncio.LifoQueue()
 
     try:
-        serial = SerialInterface(serial_command_queue, serial_feedback_queue)
+        serial = SerialInterface()
     except Exception as e:
         print(f"Failed to initialize serial interface: {e}")
         exit(1)

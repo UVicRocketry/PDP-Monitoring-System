@@ -62,13 +62,15 @@ class SerialInterface:
         self._connected = False
 
         self.__valve_state = {
-            Valves.MEV: DataValues.CLOSED,
-            Valves.N2OF: DataValues.CLOSED,
-            Valves.N2OV: DataValues.CLOSED,
-            Valves.N2F: DataValues.CLOSED,
-            Valves.RTV: DataValues.CLOSED,
-            Valves.NCV: DataValues.CLOSED,
-            Valves.ERV: DataValues.CLOSED,  
+            'N2OF': 'CLOSE',
+            'N2OV': 'CLOSE',
+            'N2F': 'CLOSE',
+            'RTV': 'CLOSE',
+            'NCV': 'CLOSE',
+            'ERV': 'CLOSE',
+            'IGPRIME': 'CLOSE',
+            'IGFIRE': 'CLOSE',
+            'MEV': 'CLOSE'
         }
 
 
@@ -198,9 +200,12 @@ class SerialInterface:
             if self.message_pending:
                 message = self.receive()
                 print(f"[Serial] Received message: {message}")
-                await queue.put(message)
-                # if message:
-                #     self.__process_command(message)
+                if message:
+                    processed_message = self.__process_serial_feedback(message)
+                    print(f"[Serial] Processed Serial message: {processed_message}")
+                    await queue.put(processed_message)
+                queue.task_done()
+
             await asyncio.sleep(0.1)
 
     async def send_async(self, queue: asyncio.LifoQueue):
@@ -215,12 +220,17 @@ class SerialInterface:
                 message = await queue.get()
                 print(f"\n[Serial] Sending message: {message}\n")
                 message_object = json.loads(message)
-                if "command" in message_object: 
-                    command = self.build_valve_message(
-                        message_object['command'], 
-                        message_object['valve'], 
-                        message_object['action'])
-                    self.__send(command)
+                command = ""
+                if "command" in message_object:
+                    if "valve" in message_object: 
+                        command = self.build_valve_message(
+                            message_object['command'], 
+                            message_object['valve'], 
+                            message_object['action'])
+                    else:
+                        command = "VC,ABORT\n"
+                    self.stream.write(command.encode())
+                queue.task_done()
             await asyncio.sleep(0.1)
 
 
@@ -242,7 +252,7 @@ class SerialInterface:
         return f"VC,{data_type},{data_label},{data_value}\n"
 
 
-    def __process_incoming_command(self, message):
+    def __process_serial_feedback(self, message):
         '''
         Name:
             SerialInterface.__process_command(message= str) -> None
@@ -252,50 +262,23 @@ class SerialInterface:
             Processes a message from the MCC
         '''
         is_message_processed = False
-        if message.endswith('\n'):
-            message_array = message.strip().split(',')
-            match message_array[1]:
-                case ResponseCommandType.SWITCH_STATE:
-                    try:
-                        self.__logger.info(f"SET SWITCH STATE: {message_array[2]}, {message_array[2]}")
-                        # send to 
-                        is_message_processed = True
-                    except:
-                        is_message_processed = False
-                    return is_message_processed
-                case ResponseCommandType.STATUS:
-
-                    if message_array[2] == ResponseCommandType.START_UP:
-                        pass
-                    
-                    elif message_array[2] == ResponseCommandType.DISARMED:
-                        pass 
-
-                    elif message_array[2] == ResponseCommandType.ARMED:
-                        pass
-
-                    elif message_array[2] == ResponseCommandType.ABORTED:
-                        pass
-
-                    elif message_array[2] == ResponseCommandType.ERROR:
-                        pass
-
-                    else:
-                        self.___logger.error(f"UNKNOWN STATUS: {message_array[2]}")
-            
-                case ResponseCommandType.SUMMARY:
-                    for i in range(2, len(message_array)):
-                        valve = message_array[i]
-                        action = message_array[i + 1]
-                        if self.__valve_state[valve] != action:
-                            self.__valve_state[valve] = action
-                            command = {
-                                'identifier': 'CONTROLS',
-                                'command': 'FEEDBACK',
-                                'valve': valve,
-                                'action': action   
-                            }
-                            print(command)
-                            self.__logger.info(f"=Feedback: {valve} is {action}")
-                        is_message_processed = True
-
+        feedback = None
+        message
+        message_array = message.strip('\r\n').split(',')
+        print(f'message array {message_array}')
+        if message_array[1] == "SUMMARY":
+            for i in range(2, len(message_array), 2):
+                current_valve = message_array[i]
+                current_action = message_array[i + 1]
+                if self.__valve_state[current_valve] != current_action:
+                    self.__valve_state[current_valve] = current_action
+                    feedback = {
+                        'identifier': 'CONTROLS',
+                        'command': 'FEEDBACK',
+                        'valve': current_valve,
+                        'action': current_action   
+                    }
+                    return feedback
+                    self.__logger.info(f"Feedback: {valve} is {action}")
+                is_message_processed = True
+            return "No Change"
