@@ -1,11 +1,16 @@
 # reference https://github.com/UVicRocketry/Hybrid-Controls-System/blob/33-comms-prot-fixing/src/MCC_GUI/comm.py
 import serial
-import queue
 import logging
 from enum import Enum
 from .serialCommandTypes import Valves, DataTypes, DataLabels, DataValues, SOURCE_TAG
+import platform
+import asyncio
+import json
+
 
 __name__ = "SerialInterface"
+
+OS = platform.system()
 
 class ResponseCommandType(Enum):
     SUMMARY = "SUMMARY"
@@ -40,40 +45,33 @@ class SerialInterface:
         message_pending: checks if there is a message pending
         close: closes the serial port
         send: sends a message
-        build_message: builds a message
-        process_command: processes a command
-        _process_summary_command: processes a summary command
-
+        build_valve_message: builds a message
+        __process_command: processes a command
     """
     def __init__(self):
-        self._message_queue = queue.Queue()
-        self._control_queue = queue.Queue()
-        self._verbose=False
 
-        self._logger = logging.getLogger(__name__)
+        self.__logger = logging.getLogger(__name__)
         self.__log_handler = None
         self.__configure_log()
 
         # lists all possible com ports
-        self.__possible_ports = None
         self.__port = None 
-        self._stream = None
+        self.stream = None
         self.__init_stream()
 
         self._connected = False
-        self._status="DCONN"
 
-        self.valves = [
-            Valves.N2OF,
-            Valves.N2OV,
-            Valves.N2F,
-            Valves.RTV,
-            Valves.NCV,
-            Valves.EVV,
-            Valves.IGPRIME,
-            Valves.IGFIRE,
-            Valves.MEV
-        ]
+        self.__valve_state = {
+            'N2OF': 'CLOSE',
+            'N2OV': 'CLOSE',
+            'N2F': 'CLOSE',
+            'RTV': 'CLOSE',
+            'NCV': 'CLOSE',
+            'ERV': 'CLOSE',
+            'IGPRIME': 'CLOSE',
+            'IGFIRE': 'CLOSE',
+            'MEV': 'CLOSE'
+        }
 
 
     def __configure_log(self):
@@ -86,56 +84,26 @@ class SerialInterface:
         self.__log_handler = logging.FileHandler('serial.log', mode='w')
         formatter = logging.Formatter('[%(name)s] %(asctime)s [%(levelname)s]: %(message)s')
         self.__log_handler.setFormatter(formatter)
-        self._logger.addHandler(self.__log_handler)
-        self._logger.setLevel(logging.INFO)
-        self._logger.info("Serial Logger configured")
+        self.__logger.addHandler(self.__log_handler)
+        self.__logger.setLevel(logging.INFO)
+        self.__logger.info("Serial Logger configured")
 
 
     def __init_stream(self):
         '''
         Name:
-            SerialInterface._init_stream() -> None
+            SerialInterface._initstream() -> None
         Desc:
             Initializes the serial port and sets the connection status
         '''
         try:
-            try:
-                self.__possible_ports = serial.tools.list_ports.comports()
-            except Exception as e:
-                self._logger.error(f"failed to list ports: {e}")
-
-            for port in self.__possible_ports:
-                if "USB" in port.device:
-                    self.__port = port.device
-                    break
-            self.__port = self.__port if self.__port else 'COM6'
-            self._stream = serial.Serial(port=self.__port, baudrate=115200, timeout=0.1)
+            print("OS: ", OS)
+            self.__port = 'COM6' if str(OS) == 'Windows' else '/dev/ttyACM0' # update this to the correct port for the VC mini PC
+            self.stream = serial.Serial(port=self.__port, baudrate=115200, timeout=0.1)
+            self.__logger.info(f"Opened serial port: {self.__port}")
         except Exception as e:
-            print(f"failed to open serial: {e}")
-            pass
-
-
-    def init_connection(self):
-        '''
-        Name:
-            SerialInterface.init_connection() -> None
-        Desc:
-            Initializes the connection to the Mission Control
-        '''
-        while True:
-            self._send("MCC,CONNECT,")
-            with self.message_queue.mutex:
-                self.message_queue.queue.clear()
-
-            try:
-                config_message = self.message_queue.get(timeout=3)
-                if ",STATUS,ESTABLISH" in config_message:
-                    self._connected = True
-                    self._status = "CONN"
-                    break 
-            except queue.Empty:
-                self._status = "ERR"
-                break
+            self.__logger.error(f"failed to open serial: {e}")
+            raise e
 
 
     @property
@@ -149,7 +117,7 @@ class SerialInterface:
             True if there is a message pending, False otherwise
         '''
         try:
-            if self._stream.in_waiting > 0:
+            if self.stream.in_waiting > 0:
                 return True
             else:
                 return False
@@ -167,7 +135,7 @@ class SerialInterface:
             True if the port was closed successfully, False otherwise
         '''
         try: 
-            self._stream.close()
+            self.stream.close()
             self._connected = False
             return True
         except:
@@ -181,13 +149,12 @@ class SerialInterface:
         Desc:
             Sends an abort signal to the MCC
         '''
+        with self.__message_queue.mutex:
+            self.__message_queue.queue.clear()
+        self.__send("MCC,ABORT,")
 
-        with self.message_queue.mutex:
-            self.message_queue.queue.clear()
-        self._send("MCC,ABORT,")
 
-
-    def send(self, message) -> bool:
+    def __send(self, message) -> bool:
         '''
         Name: 
             SerialInterface._send(message= str) -> bool
@@ -199,15 +166,13 @@ class SerialInterface:
         Desc: Sends a message to the serial port
         '''
         try: 
-            self._stream.write(message.encode())
-            if self._verbose:
-                pass
+            self.stream.write(message.encode())
             return True
         except:
             return False
      
 
-    def _receive(self) -> bool:
+    def receive(self) -> str:
         '''
         Name: 
             SerialInterface._receive() -> bool
@@ -217,31 +182,62 @@ class SerialInterface:
         Returns:
             True if the message was received successfully, False otherwise
         '''
-        message = ""
-        try:
-            message = message + self._stream.readline().decode()
-            if message.endswith("\n"):
-                message = message.strip()
-                self.message_queue.put(message)
-            else: 
-                self._logger.info(f"Received incomplete message: {message}")
-
-            if "ABORT" in message:
-                with self.message_queue.mutex:
-                        self.message_queue.queue.clear()
-                self.message_queue.put(message)
-
-        except:
-            self._logger.info(f"Failed to receive: {message}")
-            return False
-        
-        return True
-
-
-    def build_message(self, data_type, data_label, data_value, source_tag=SOURCE_TAG) -> str:
+        message = self.stream.readline().decode()
+        self.__logger.info(f"VC Raw message received: {message}")
+        # if "\n'" in feedback:
+        #     print("contains /\n/")
+    
+        return message
+    
+    async def receive_loop(self, queue: asyncio.LifoQueue):
         '''
         Name:
-            SerialInterface.build_message(source_tag="VC", data_type= DataTypes, data_label= DataLabels, data_value= DataValues) -> str
+            SerialInterface.receive_loop() -> None
+        Desc:
+            The main loop for receiving messages
+        '''
+        while True:
+            if self.message_pending:
+                message = self.receive()
+                print(f"[Serial] Received message: {message}")
+                if message:
+                    processed_message = self.__process_serial_feedback(message)
+                    print(f"[Serial] Processed Serial message: {processed_message}")
+                    await queue.put(processed_message)
+                queue.task_done()
+
+            await asyncio.sleep(0.1)
+
+    async def send_async(self, queue: asyncio.LifoQueue):
+        '''
+        Name:
+            SerialInterface.send_async() -> None
+        Desc:
+            The main loop for sending messages
+        '''
+        while True:
+            if not queue.empty():
+                message = await queue.get()
+                print(f"\n[Serial] Sending message: {message}\n")
+                message_object = json.loads(message)
+                command = ""
+                if "command" in message_object:
+                    if "valve" in message_object: 
+                        command = self.build_valve_message(
+                            message_object['command'], 
+                            message_object['valve'], 
+                            message_object['action'])
+                    else:
+                        command = "VC,ABORT\n"
+                    self.stream.write(command.encode())
+                queue.task_done()
+            await asyncio.sleep(0.1)
+
+
+    def build_valve_message(self, data_type, data_label, data_value, source_tag=SOURCE_TAG) -> str:
+        '''
+        Name:
+            SerialInterface.build_valve_message(source_tag="VC", data_type= DataTypes, data_label= DataLabels, data_value= DataValues) -> str
         Args:
             source_tag: the source of the command
             data_type: the type of data
@@ -256,69 +252,33 @@ class SerialInterface:
         return f"VC,{data_type},{data_label},{data_value}\n"
 
 
-    def process_command(self, message):
+    def __process_serial_feedback(self, message):
         '''
         Name:
-            SerialInterface.process_command(message= str) -> None
+            SerialInterface.__process_command(message= str) -> None
         Args:
             message: the message to process
         Desc:
             Processes a message from the MCC
         '''
         is_message_processed = False
-        if message in ',':
-            message_array = message.split(',')
-            match message_array[1]:
-                case ResponseCommandType.SWITCH_STATE:
-                    try:
-                        self.__logger.info(f"SET SWITCH STATE: {message_array[2]}, {message_array[2]}")
-                        # send to 
-                        is_message_processed = True
-                    except:
-                        is_message_processed = False
-                    return is_message_processed
-                
-                case ResponseCommandType.STATUS:
-
-                    if message_array[2] == ResponseCommandType.START_UP:
-                        pass
-                    
-                    elif message_array[2] == ResponseCommandType.DISARMED:
-                        pass
-
-                    elif message_array[2] == ResponseCommandType.ARMED:
-                        pass
-
-                    elif message_array[2] == ResponseCommandType.ABORTED:
-                        pass
-
-                    elif message_array[2] == ResponseCommandType.ERROR:
-                        pass
-
-                    else:
-                        self.__logger.error(f"UNKNOWN STATUS: {message_array[2]}")
-            
-                case ResponseCommandType.SUMMARY:
-                    try:
-                        self.__logger.info(f"SUMMARY: {message_array[2]}")
-                        is_message_processed = True
-                    except:
-                        is_message_processed = False
-                    return is_message_processed
-
-
-    def _process_summary_command(self, message):
-        '''
-        Name:
-            SerialInterface._process_summary_command(message= str) -> None
-        Args:
-            message: the message to process
-        Desc:
-            Processes a summary command from the Mission Control
-        '''
-        if self._verbose:
-            self._logger.info("INFO", f"Received summary command: {message}")
-        for i in range(2, len(message), 2):
-            self._conf[message[i]] = message[i + 1]
-            if self._verbose:
-                self._logger.info(f"INFO {message[i]} {message[i + 1]}")
+        feedback = None
+        message
+        message_array = message.strip('\r\n').split(',')
+        print(f'message array {message_array}')
+        if message_array[1] == "SUMMARY":
+            for i in range(2, len(message_array), 2):
+                current_valve = message_array[i]
+                current_action = message_array[i + 1]
+                if self.__valve_state[current_valve] != current_action:
+                    self.__valve_state[current_valve] = current_action
+                    feedback = {
+                        'identifier': 'CONTROLS',
+                        'command': 'FEEDBACK',
+                        'valve': current_valve,
+                        'action': current_action   
+                    }
+                    return feedback
+                    self.__logger.info(f"Feedback: {valve} is {action}")
+                is_message_processed = True
+            return "No Change"
