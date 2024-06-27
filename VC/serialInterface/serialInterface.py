@@ -189,31 +189,32 @@ class SerialInterface:
     
         return message
     
-    async def receive_loop(self, queue: asyncio.LifoQueue):
+    async def receive_loop(self, queue: asyncio.LifoQueue) -> None:
         '''
         Name:
             SerialInterface.receive_loop() -> None
         Desc:
-            The main loop for receiving messages
+            The coroutine for receiving messages from serial and adding to the queue
         '''
         while True:
             if self.message_pending:
                 message = self.receive()
-                print(f"[Serial] Received message: {message}")
+                self._logger.info(f"[Serial] Received message: {message}")
                 if message:
                     processed_message = self.__process_serial_feedback(message)
-                    print(f"[Serial] Processed Serial message: {processed_message}")
+                    self._logger.info(f"[Serial] Processed Serial message: {processed_message}")
                     await queue.put(processed_message)
                 queue.task_done()
 
             await asyncio.sleep(0.1)
 
-    async def send_async(self, queue: asyncio.LifoQueue):
+
+    async def send_async(self, queue: asyncio.LifoQueue) -> None:
         '''
         Name:
             SerialInterface.send_async() -> None
         Desc:
-            The main loop for sending messages
+            The coroutine for sending commands from mission control over serial
         '''
         while True:
             if not queue.empty():

@@ -35,7 +35,7 @@ class WebSocketServer:
         self.__logger = logging.getLogger(__name__)
         self.__log_handler = None
 
-        self.__incomming_queue = asyncio.LifoQueue()
+        self.__incoming_queue = asyncio.LifoQueue()
         self.__configure_log()
 
 
@@ -67,22 +67,22 @@ class WebSocketServer:
         await self.__wss_instance.send(json.dumps({"identifier": "STARTUP", "data": "VC CONNECTED"}))
         self.__logger.info(f"VC Connected")
         async for message in websocket:
-            await self.__incomming_queue.put(message)
-            self.__incomming_queue.task_done()
+            await self.__incoming_queue.put(message)
+            self.__incoming_queue.task_done()
             await asyncio.sleep(0)
 
 
     async def wss_reception_handler(self, queue):
         while True:
-            message = await self.__incomming_queue.get()
+            message = await self.__incoming_queue.get()
             await queue.put(message)
             await asyncio.sleep(0)
 
     
-    async def serial_feedback_wss_handler(self, queue):
+    async def serial_feedback_wss_handler(self, queue: asyncio.LifoQueue):
         '''
         Name:
-            WebSocketServer.__serial_feedback_wss_handler(websocket= websockets.WebSocketServerProtocol) -> None
+            WebSocketServer.__serial_feedback_wss_handler(queue: asyncio.LifoQueue) -> None
         Args:
             websocket: the websocket connection
         Desc:
@@ -92,9 +92,10 @@ class WebSocketServer:
             feedback = None
             if self.__wss_instance is not None:
                 try:
-                    # Try to get feedback from the serial queue. if none available then continue to the next iteration
+                    # Try to get feedback from the serial queue. 
+                    # if none available then continue to the next iteration
                     feedback = await queue.get() 
-                    self.__logger.info(f"Recieved from serial feedback: {feedback}")
+                    self.__logger.info(f"Received from serial feedback: {feedback}")
             
                     await self.__wss_instance.send(json.dumps({
                         "identifier": "FEEDBACK",

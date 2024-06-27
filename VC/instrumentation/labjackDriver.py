@@ -4,7 +4,7 @@ from datetime import datetime as dt
 from enum import Enum
 import u6
 import logging
-from .InstrumentationLogPhrases import InstrumentationLogPhrases
+# from .InstrumentationLogPhrases import InstrumentationLogPhrases
 import queue as Queue
 from copy import deepcopy
 import threading
@@ -179,3 +179,6 @@ class LabJackU6Driver:
 
     def __sample_sensors(self):
         print("Sample Sensors")
+
+u6_driver = LabJackU6Driver()
+u6_driver.start_stream(50)
