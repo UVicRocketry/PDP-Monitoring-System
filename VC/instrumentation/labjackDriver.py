@@ -4,7 +4,7 @@ from datetime import datetime as dt
 from enum import Enum
 import u6
 import logging
-from .InstrumentationLogPhrases import InstrumentationLogPhrases
+# from .InstrumentationLogPhrases import InstrumentationLogPhrases
 import queue as Queue
 from copy import deepcopy
 import threading
@@ -29,7 +29,7 @@ class LabJackU6Driver:
         self.data = Queue.Queue()
 
         self.MAX_REQUESTS = 10000
-        self.SCAN_FREQUENCY = 5000
+        self.SCAN_FREQUENCY = 500
         self.__missed = 0
         self.__dataCount = 0
         self.__packetCount = 0
@@ -87,7 +87,7 @@ class LabJackU6Driver:
         print("Reset Sensor")
 
 
-    def start_stream(self, max_requests):
+    def start_stream(self):
         """
         Name:
             LabJackU6Driver.start_stream(max_requests: int) -> None
@@ -96,15 +96,22 @@ class LabJackU6Driver:
         Args:
             max_requests: The maximum number of requests to make before stopping the stream.
         """
+        negative_channel_pairs = [56, 57, 58, 59, 72, 73, 74, 75, 76, 88, 89, 90] # anything referred to refernce/ground
+        positive_channel_pairs = [48, 49, 50, 51, 64, 65, 66, 67, 68, 80, 81, 82] # anything referred to signal
+        channel_numbers = positive_channel_pairs
+        channel_options = [0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7]
+        settling_factor = 1 # 
+        resulotion_index = 1 # (auto) 0 - 8 ()
+        num_channels = 12 # must match the size of 
+
         self.__d.streamConfig(
-            NumChannels=1, 
-            ChannelNumbers=[0], 
-            ChannelOptions=[0], 
+            NumChannels=num_channels, 
+            ChannelNumbers=channel_numbers,   #82 and 68 arent used. delete if broke 
+            ChannelOptions=channel_options, 
             SettlingFactor=1, 
             ResolutionIndex=1, 
             ScanFrequency=self.SCAN_FREQUENCY
         )
-        self.MAX_REQUESTS = max_requests
         self.__stream()
 
 
@@ -165,7 +172,7 @@ class LabJackU6Driver:
                 if self.__dataCount >= self.MAX_REQUESTS:
                     self._finished = True
                 
-                self.__d.streamStop()    
+                # self.__d.streamStop()    
                 stop = dt.now()
 
         except Exception as e:
@@ -179,3 +186,6 @@ class LabJackU6Driver:
 
     def __sample_sensors(self):
         print("Sample Sensors")
+
+driver = LabJackU6Driver()
+driver.start_stream()

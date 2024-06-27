@@ -229,6 +229,7 @@ class SerialInterface:
                             message_object['action'])
                     else:
                         command = "VC,ABORT\n"
+                    self.__logger.info(f"Writing to serial: {command}")
                     self.stream.write(command.encode())
                 queue.task_done()
             await asyncio.sleep(0.1)
