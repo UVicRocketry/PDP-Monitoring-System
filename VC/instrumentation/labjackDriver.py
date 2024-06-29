@@ -160,11 +160,15 @@ class LabJackU6Driver:
             try:
                 result = self.data.get(True, 1)
                 output_voltage = self.__d.processStreamData(result['result'])
+                formatted_output_voltage = {}
                 # normalize the contents of the output_voltage dictionary
                 for key in output_voltage:
                     #take the average of the output voltage
-                    output_voltage[key] = sum(output_voltage[key]) / len(output_voltage[key])
-                    
+                    averaged = sum(output_voltage[key]) / len(output_voltage[key])
+                    formatted_output_voltage[SensorCannelMap[key]] = averaged
+
+                print(formatted_output_voltage)
+
                 print(f"Output Voltage: {output_voltage}")
             except Queue.Empty:
                 if self._finished:
