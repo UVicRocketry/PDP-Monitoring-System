@@ -1,5 +1,6 @@
 from server.ws_server import WebSocketServer
 from serialInterface.serialInterface import SerialInterface
+from instrumentation.labjackDriver import LabJackU6Driver
 import asyncio
 
 def main() -> None:
@@ -11,9 +12,20 @@ def main() -> None:
     '''
     serial = None
     wss = None
+    instrumentation = None
     
     serial_feedback_queue = asyncio.LifoQueue()
     serial_command_queue = asyncio.LifoQueue()
+
+    instrumentation_feedback_queue = asyncio.LifoQueue()
+    # instrumentation_command_queue = asyncio.LifoQueue()
+    try:
+        instrumentation = LabJackU6Driver()
+        pass
+    except Exception as e:
+        print(f"Failed to initialize LabJackU6Driver: {e}")
+        exit(1)
+
 
     try:
         serial = SerialInterface()
