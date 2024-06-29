@@ -9,6 +9,8 @@ import queue as Queue
 from copy import deepcopy
 import threading
 
+import matplotlib.pyplot as plt
+
 __name__ = "Instrumentation"
 
 class InstrumentationCommand(Enum):
@@ -130,7 +132,7 @@ class LabJackU6Driver:
         channel_numbers = positive_channel_pairs
         channel_options = [0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA]
         settling_factor = 1 # 
-        resulotion_index = 3 # (auto) 0 - 8 ()
+        resolution_index = 3 # (auto) 0 - 8 ()
         num_channels = 12 # must match the size of 
         scan_frequency = 500
 
@@ -139,7 +141,7 @@ class LabJackU6Driver:
             ChannelNumbers=channel_numbers,   #82 and 68 arent used. delete if broke 
             ChannelOptions=channel_options, 
             SettlingFactor=settling_factor, 
-            ResolutionIndex=resulotion_index, 
+            ResolutionIndex=resolution_index, 
             ScanFrequency=scan_frequency
         )
         self.__stream()
@@ -158,6 +160,11 @@ class LabJackU6Driver:
             try:
                 result = self.data.get(True, 1)
                 output_voltage = self.__d.processStreamData(result['result'])
+                # normalize the contents of the output_voltage dictionary
+                for key in output_voltage:
+                    #take the average of the output voltage
+                    output_voltage[key] = sum(output_voltage[key]) / len(output_voltage[key])
+                    
                 print(f"Output Voltage: {output_voltage}")
             except Queue.Empty:
                 if self._finished:
