@@ -8,6 +8,7 @@ import logging
 import queue as Queue
 from copy import deepcopy
 import threading
+import asyncio
 
 import matplotlib.pyplot as plt
 
@@ -34,40 +35,20 @@ SensorCannelMap = {
     "AIN82": "SHUNT"
 }
 
-class SensorCannelMap(Enum):
-    T_RUN_TANK = "AIN48",
-    T_INJECTOR = "AIN49",
-    T_COMBUSTION_CHAMBER = "AIN50",
-    T_POST_COMBUSTION = "AIN51",
-    P_N2O_FLOW = "AIN64",
-    P_N2_FLOW = "AIN65",
-    P_RUN_TANK = "AIN66",
-    P_INJECTOR = "AIN67",
-    P_COMBUSTION_CHAMBER = "AIN68",
-    L_RUN_TANK = "AIN80",
-    L_TRUST = "AIN81",
-    SHUNT = "AIN82"
 
 class LabJackU6Driver:
     def __init__(self):
         self.__d = u6.U6()
 
-        self._logger = logging.getLogger(__name__)
+        self.__logger = logging.getLogger(__name__)
         self.__log_handler = None
         self.__configure_log()
     
         self.data = Queue.Queue()
+        self.SCAN_FREQUENCY = 50
 
-        self.MAX_REQUESTS = 10000
-        self.SCAN_FREQUENCY = 5000
-        self.__missed = 0
-        self.__dataCount = 0
-        self.__packetCount = 0
-    
-        self._finished = False
-        
         self.__configure_log()
-
+       
         try:
             self.__calibrate()
         except Exception as e:
@@ -75,6 +56,12 @@ class LabJackU6Driver:
             traceback.print_exc(file=sys.stdout)
             sys.exit(1)
         
+        try:
+            self.__configure_stream()
+        except Exception as e:
+            self.__logger.error(f"Failed to configure stream: {e}")
+            traceback.print_exc(file=sys.stdout)
+            sys.exit(1)
     
     def __configure_log(self):
         '''
@@ -86,39 +73,16 @@ class LabJackU6Driver:
         self.__log_handler = logging.FileHandler('instrumentation.log', mode='w')
         formatter = logging.Formatter('[%(name)s] %(asctime)s [%(levelname)s]: %(message)s')
         self.__log_handler.setFormatter(formatter)
-        self._logger.addHandler(self.__log_handler)
-        self._logger.setLevel(logging.INFO)
-        self._logger.info("Instrumentation Logger configured")
+        self.__logger.addHandler(self.__log_handler)
+        self.__logger.setLevel(logging.INFO)
+        self.__logger.info("Instrumentation Logger configured")
     
 
     def __calibrate(self):
         self.__d.getCalibrationData()
 
 
-    def choose_mode(self, command):
-        if command == InstrumentationCommand.STATUS:
-            #self.__logger.info(InstrumentationLogPhrases.STARTING_STATUS_MODE)
-            self.__status()
-        elif command == InstrumentationCommand.RESET_SENSOR:
-            #self.__logger.info(InstrumentationLogPhrases.STARTING_RESET_SENSOR_MODE)
-            self.__reset_sensor()
-        elif command == InstrumentationCommand.STREAM_SENSORS:
-            #self.__logger.info(InstrumentationLogPhrases.STARTING_SAMPLE_SENSORS_MODE)
-            self.__stream()
-        elif command == InstrumentationCommand.SAMPLE_SENSORS:
-            #self.__logger.info(InstrumentationLogPhrases.STARTING_SAMPLE_SENSORS_MODE)
-            self.__sample_sensors()
-
-
-    def __status(self):
-        print("Status")
-
-
-    def __reset_sensor(self):
-        print("Reset Sensor")
-
-
-    def start_stream(self):
+    def __configure_stream(self):
         """
         Name:
             LabJackU6Driver.start_stream(max_requests: int) -> None
@@ -132,9 +96,9 @@ class LabJackU6Driver:
         channel_numbers = positive_channel_pairs
         channel_options = [0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA]
         settling_factor = 1 # 
-        resolution_index = 3 # (auto) 0 - 8 ()
+        resolution_index = 5 # (auto) 0 - 8 ()
         num_channels = 12 # must match the size of 
-        scan_frequency = 500
+        scan_frequency = 50
 
         self.__d.streamConfig(
             NumChannels=num_channels, 
@@ -144,89 +108,41 @@ class LabJackU6Driver:
             ResolutionIndex=resolution_index, 
             ScanFrequency=scan_frequency
         )
-        self.__stream()
+        self.__logger.info("Stream configured")
 
 
-    def __stream(self):
+    async def stream(self, queue: asyncio.LifoQueue):
         """
         Name:
             LabJackU6Driver.__stream() -> None
         Desc:
             Starts streaming sensor data from the LabJack U6 device and processes it.
         """
-        self.stream_thread = threading.Thread(target=self.__stream_sensors)
-        self.stream_thread.start()
-        while True:
-            try:
-                result = self.data.get(True, 1)
-                output_voltage = self.__d.processStreamData(result['result'])
-                formatted_output_voltage = {}
-                # normalize the contents of the output_voltage dictionary
-                for key in output_voltage:
-                    #take the average of the output voltage
-                    averaged = sum(output_voltage[key]) / len(output_voltage[key])
-                    formatted_output_voltage[SensorCannelMap[key]] = averaged
-
-                print(formatted_output_voltage)
-
-                print(f"Output Voltage: {output_voltage}")
-            except Queue.Empty:
-                if self._finished:
-                    #self.__logger.info(InstrumentationLogPhrases.STREAMING_FINISHED)
-                    break
-                else:
-                    #self.__logger.info(InstrumentationLogPhrases.QUEUE_EMPTY_ENDING_STREAM)
-                    self._finished = True
-                pass
-            except Exception as e:
-                self.__logger.error("Exception: %s %s" % (type(e), e))
-                self._finished = True
-                break
-
-        self.stream_thread.join()
-
-
-    def __stream_sensors(self):
-        """
-        Name:
-            LabJackU6Driver.__stream_sensors() -> None
-        Desc:
-            Streams sensor data from the LabJack U6 device and puts it into the data queue for processing.
-        """
-        self._finished = False
-
-        start = dt.now()
         try:
             self.__d.streamStart()
-            while not self._finished:
+            while True:
                 returnDict = next(self.__d.streamData(convert=False))
-
                 if returnDict is None:
-                    #self.__logger.error(InstrumentationLogPhrases.FAILED_TO_STREAM)
-                    continue
-
-                self.data.put_nowait(deepcopy(returnDict))
-
-                self.__missed += returnDict['missed']
-                self.__dataCount += 1
-
-                if self.__dataCount >= self.MAX_REQUESTS:
-                    self._finished = True
-                
-                # self.__d.streamStop()    
-                stop = dt.now()
+                    self.__logger.error(InstrumentationLogPhrases.FAILED_TO_STREAM)
+    
+                try:
+                    output_voltage = self.__d.processStreamData(returnDict['result']) 
+                    formatted_output_voltage = {}
+                    self.__logger.info(str(output_voltage))
+                    for key in output_voltage:
+                        #take the average of the output voltage
+                        averaged = sum(output_voltage[key]) / len(output_voltage[key])
+                        formatted_output_voltage[SensorCannelMap[key]] = averaged
+                    await queue.put(formatted_output_voltage)
+                    await asyncio.sleep(0)
+                except Exception as e:
+                    print(f'Failed to process data: {e}')
 
         except Exception as e:
             try:
                 self.__d.streamStop()
             except Exception as e:
                 self.__logger.error("Failed to stop stream: %s %s" % (type(e), e))
-            
-            self._finished = True
 
-
-    def __sample_sensors(self):
-        print("Sample Sensors")
-
-driver = LabJackU6Driver()
-driver.start_stream()
+    async def processVoltages():
+        pass

@@ -19,13 +19,13 @@ def main() -> None:
 
     instrumentation_feedback_queue = asyncio.LifoQueue()
     # instrumentation_command_queue = asyncio.LifoQueue()
+
     try:
         instrumentation = LabJackU6Driver()
-        pass
+        print("instrumentation Driver configured")
     except Exception as e:
         print(f"Failed to initialize LabJackU6Driver: {e}")
         exit(1)
-
 
     try:
         serial = SerialInterface()
@@ -44,10 +44,15 @@ def main() -> None:
     # WebSocket server task
     event_loop.create_task(wss.start())
     
+    # Instrumentation
+    event_loop.create_task(instrumentation.stream(instrumentation_feedback_queue))
+
     # Serial sending and receiving tasks
     event_loop.create_task(serial.receive_loop(serial_feedback_queue))
     event_loop.create_task(serial.send_async(serial_command_queue))
     
+    # websocket
+    event_loop.create_task(wss.instrumentation_wss_handler(instrumentation_feedback_queue))
     event_loop.create_task(wss.serial_feedback_wss_handler(serial_feedback_queue))
     event_loop.create_task(wss.wss_reception_handler(serial_command_queue))
     

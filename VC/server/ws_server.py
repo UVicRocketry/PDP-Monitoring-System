@@ -116,7 +116,22 @@ class WebSocketServer:
 
     
     async def instrumentation_wss_handler(self, queue):
-        pass
+        while True:
+            feedback = None
+            if self.__wss_instance is not None:
+                try:
+                    feedback = await queue.get()
+                    await self.__wss_instance.send(json.dumps({
+                        "identifier": "INSTRUMENTATION",
+                        "data": feedback
+                    }))
+                
+                except asyncio.QueueEmpty:
+                    print("queue empty")
+                    await asyncio.sleep(0)
+                    return
+            await asyncio.sleep(2)
+
     
     async def send_message(self, message):
         '''
