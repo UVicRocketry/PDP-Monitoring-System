@@ -34,19 +34,26 @@ cd VC/ && python3 main.py
 
 # Startup Guide
 
-First connect over ssh to the mini PC [ssh info](comms.md#ssh-credentials). you'll need two terminals one for client (Ground-Support) and the other for the server (PDP-Monitoring-System). Then navigate to `~/Documents/Github` directory.  
+First connect over ssh to the mini PC [ssh info](comms.md#ssh-credentials). you'll need three terminals one for client (Ground-Support) and the others for the serail and instrumentation server (PDP-Monitoring-System). Then navigate to `~/Documents/Github` directory.  
 
-In the first ssh terminal run the following commands to start the monitoring system:
+In the first ssh terminal run the following commands to start the serail server:
 ```bash
 cd /Documents/Github/
-sh start_cart.sh
+sudo sh start_serail.sh
 ```
 
-In the first ssh terminal run the following commands to start the monitoring system:
+In the second ssh terminal run the following commands to start the instrumentation server:
 
 ```bash
 cd /Documents/Github/
-sh start_valve.sh
+sudo sh start_instrumentation.sh
+```
+
+In the third ssh terminal run the following commands to start the client:
+
+```bash
+cd /Documents/Github/
+sudo sh start_gui.sh
 ```
 
 The system is now running and can be accessed by connecting to the `UVR-PDP` network. The client can be accessed by going to `192.168.0.1:3000`.

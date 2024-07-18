@@ -3,29 +3,23 @@ from serialInterface.serialInterface import SerialInterface
 from instrumentation.labjackDriver import LabJackU6Driver
 import asyncio
 
+SERAIL_PORT = 8080
+
 def main() -> None:
     '''
     Name:
         main() -> None
     Desc:
-        Main entry point for the VC program
+        Main entry point for the valve cart. There are two websocket servers required, one for serail and one for instrumentation. 
+        Without two servers the one connection will be overloaded by traffic close abruptly.
     '''
     serial = None
-    wss = None
-    instrumentation = None
+    wss_serail = None
     
+    # the queues are used to send commands and feecback from task to task. 
+    # ex: wss (command) -> serail(move valve); serail (feedback) -> wss (feedback) 
     serial_feedback_queue = asyncio.LifoQueue()
     serial_command_queue = asyncio.LifoQueue()
-
-    instrumentation_feedback_queue = asyncio.LifoQueue()
-    # instrumentation_command_queue = asyncio.LifoQueue()
-
-    try:
-        instrumentation = LabJackU6Driver()
-        print("instrumentation Driver configured")
-    except Exception as e:
-        print(f"Failed to initialize LabJackU6Driver: {e}")
-        exit(1)
 
     try:
         serial = SerialInterface()
@@ -34,33 +28,30 @@ def main() -> None:
         exit(1)
 
     try:
-        wss = WebSocketServer()
+        wss_serail = WebSocketServer(port=SERAIL_PORT)
     except Exception as e:
         print(f"Failed to initialize websocket server: {e}")
         exit(1)
 
     event_loop = asyncio.get_event_loop() 
 
-    # WebSocket server task
-    event_loop.create_task(wss.start())
-    
-    # Instrumentation
-    event_loop.create_task(instrumentation.stream(instrumentation_feedback_queue))
+    # WebSocket server for serail
+    event_loop.create_task(wss_serail.start())
+
 
     # Serial sending and receiving tasks
     event_loop.create_task(serial.receive_loop(serial_feedback_queue))
     event_loop.create_task(serial.send_async(serial_command_queue))
     
-    # websocket
-    event_loop.create_task(wss.instrumentation_wss_handler(instrumentation_feedback_queue))
-    event_loop.create_task(wss.serial_feedback_wss_handler(serial_feedback_queue))
-    event_loop.create_task(wss.wss_reception_handler(serial_command_queue))
+    # websocket handlers
+    event_loop.create_task(wss_serail.serial_feedback_wss_handler(serial_feedback_queue))
+    event_loop.create_task(wss_serail.wss_reception_handler(serial_command_queue))
     
     try:
         event_loop.run_forever()
     except KeyboardInterrupt:
         event_loop.close()
-        print("VC program terminated by user")
+        print("program terminated by user")
         exit(0)
 
 if __name__ == "__main__":

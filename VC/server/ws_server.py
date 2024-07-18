@@ -11,7 +11,7 @@ __name__ = "WebSocketServer"
 OS = platform.system()
 
 HOST = "192.168.0.1" if OS == "Linux" else "localhost"
-PORT = 8888
+DEFTAULT_PORT = 8888
 
 class Command:
     def __init__(self, command, valve, action):
@@ -34,9 +34,13 @@ class InstrumentationFeedback:
 
 
 class WebSocketServer:
-    def __init__(self):
+    def __init__(self, port=None):
+        if port is None:
+            self.__port = PORT
+        else: 
+            self.__port = port
+
         self.__host = HOST
-        self.__port = PORT
         self.__wss_instance = None
 
         self.__logger = logging.getLogger(__name__)
