@@ -79,22 +79,22 @@ class LabJackU6Driver:
         self.__streamConfigurationDetails = {
             # The number of channels (normally two channel per sensor one positive and one negative)
             "NumChannels": 12,
-            #
+            # positive channels
             "ChannelNumbers": [48, 49, 50, 51, 64, 65, 66, 67, 68, 80, 81, 82],
             # 
-            "ChannelOptions": [],
+            "ChannelOptions": [0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A],
             #
             "SettlingFactor": 1,
             #
             "ResolutionIndex": 0,
             #
-            "ScanFrequency": 1,
+            "ScanFrequency": 12,
             #
             "SamplesPerPacket": 25,
             #
-            "InternalStreamClockFrequency": 0
+            "InternalStreamClockFrequency": 0,
             #
-            "DivideClockBy256": False
+            "DivideClockBy256": True,
             #
             "ScanInterval": 1
         }
@@ -114,7 +114,7 @@ class LabJackU6Driver:
             sys.exit(1)
 
 
-    def __set_stream_config_details(self, 
+    def set_stream_config_details(self, 
         resolution_index=0, 
         settling_factor=1, 
         channel_numbers=[],
@@ -152,30 +152,24 @@ class LabJackU6Driver:
         Args:
             max_requests: The maximum number of requests to make before stopping the stream.
         """
-        negative_channel_pairs = [56, 57, 58, 59, 72, 73, 74, 75, 76, 88, 89, 90] # anything referred to refernce/ground
-        positive_channel_pairs = [48, 49, 50, 51, 64, 65, 66, 67, 68, 80, 81, 82] # anything referred to signal
-        channel_numbers = positive_channel_pairs
-        channel_options = [0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA]
-        settling_factor = 1 # 
-        resolution_index = 5 # (auto) 0 - 8 ()
-        num_channels = 12 # must match the size of 
-        scan_frequency = 50
-
-        self.__d.streamConfig(
-            NumChannels     = self.__streamConfigurationDetails["NumChannels"], 
-            ChannelNumbers  = self.__streamConfigurationDetails["ChannelNumbers"],   #82 and 68 arent used. delete if broke 
-            ChannelOptions  = self.__streamConfigurationDetails["ChannelOptions"], 
-            SettlingFactor  = self.__streamConfigurationDetails["SettlingFactor"], 
-            ResolutionIndex = self.__streamConfigurationDetails["ResolutionIndex"],
-            # ScanFrequency   = self.__streamConfigurationDetails["ScanFrequency"],
-            # -- OR --
-            SamplePerPacket = self.__streamConfigurationDetails["SamplePerPacket"],
-            IntervalStreamClockFrequency= self.__streamConfigurationDetails["IntervalStreamClockFrequency"],
-            DivideClockBy256= self.__streamConfigurationDetails["DivideClockBy256"],
-            ScanInterval    = self.__streamConfigurationDetails["ScanInterval"]
-        )
-        self.__logger.info("Stream configured")
-
+        try:
+            self.__d.streamConfig(
+                NumChannels     = self.__streamConfigurationDetails["NumChannels"], 
+                ChannelNumbers  = self.__streamConfigurationDetails["ChannelNumbers"],   #82 and 68 arent used. delete if broke 
+                ChannelOptions  = self.__streamConfigurationDetails["ChannelOptions"], 
+                SettlingFactor  = self.__streamConfigurationDetails["SettlingFactor"], 
+                ResolutionIndex = self.__streamConfigurationDetails["ResolutionIndex"],
+                ScanFrequency   = self.__streamConfigurationDetails["ScanFrequency"],
+                # -- OR --
+                # SamplesPerPacket = self.__streamConfigurationDetails["SamplesPerPacket"],
+                # InternalStreamClockFrequency= self.__streamConfigurationDetails["InternalStreamClockFrequency"],
+                # DivideClockBy256= self.__streamConfigurationDetails["DivideClockBy256"],
+                # ScanInterval    = self.__streamConfigurationDetails["ScanInterval"]
+            )
+            self.__logger.info("Stream configured")
+        except Exception as e:
+            print('failed to initalize stream due to: {e}')
+      
 
     async def stream(self, queue: asyncio.LifoQueue):
         """
@@ -195,12 +189,16 @@ class LabJackU6Driver:
                     output_voltage = self.__d.processStreamData(returnDict['result']) 
                     formatted_output_voltage = {}
                     self.__logger.info(str(output_voltage))
+                    
                     for key in output_voltage:
                         #take the average of the output voltage
                         averaged = sum(output_voltage[key]) / len(output_voltage[key])
                         formatted_output_voltage[SensorCannelMap[key]] = averaged
+                    
+                    print(f'labjackdriver: {formatted_output_voltage}')
                     await queue.put(formatted_output_voltage)
-                    await asyncio.sleep(0)
+                    await asyncio.sleep(1)
+
                 except Exception as e:
                     print(f'Failed to process data: {e}')
 
