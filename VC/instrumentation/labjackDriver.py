@@ -9,6 +9,8 @@ import queue as Queue
 from copy import deepcopy
 import threading
 import asyncio
+import random
+from .labjackconfig import SensorCannelMap, GAIN_OFFSETS, default_stream_Config_details
 
 import matplotlib.pyplot as plt
 
@@ -20,108 +22,69 @@ class InstrumentationCommand(Enum):
     STREAM_SENSORS = "STREAM_SENSORS",
     SAMPLE_SENSORS = "SAMPLE_SENSORS"
 
-SensorCannelMap = {
-    "AIN48": "T_RUN_TANK",
-    "AIN49": "T_INJECTOR",
-    "AIN50": "T_COMBUSTION_CHAMBER",
-    "AIN51": "T_POST_COMBUSTION",
-    "AIN64": "P_N2O_FLOW",
-    "AIN65": "P_N2_FLOW",
-    "AIN66": "P_RUN_TANK",
-    "AIN67": "P_INJECTOR",
-    "AIN68": "P_COMBUSTION_CHAMBER",
-    "AIN80": "L_RUN_TANK",
-    "AIN81": "L_TRUST",
-    "AIN82": "SHUNT"
-}
-
-
 class LabJackU6Driver:
-    def __init__(self):
-        self.__d = u6.U6()
+    def __init__(self, test_mode=False):
+        self.__test_mode = test_mode
+        self.__d = None
+
+        if not self.__test_mode:
+            self.__d = u6.U6()
+        
         self.__logger = logging.getLogger(__name__)
         self.__log_handler = None
         self.__configure_log()
 
-        '''
-        **streamConfig deatils:**
+        # see config.py for more information on the stream configuration details
+        self.__streamConfigurationDetails = default_stream_Config_details
+
+        if not self.__test_mode:
+            try:
+                self.__calibrate()
+                pass
+            except Exception as e:
+                self.__logger.error(f"Failed to calibrate: {e}")
+                traceback.print_exc(file=sys.stdout)
+                sys.exit(1)
         
-        For information from labjack check out section 5.2.12 of the user manual for the U6 in the docs section of this repo
-
-        - `NumChannels` int: number of channel to sample
-        - `ResolutionIndes` int: Resolution index of samples (0-8)
-        - `ChannelNumbers' []: which channels to sample
-        - `ChannelOptions` []: Set bit 7 for differential reading.
-            ChannelOption Byte details: 
-                bit 4&5 (GainIndex): 0(b00)=x1, 1(b01)=x10, 2(b10)=x100, 3(b11)=x1000
-                bit 7 (differentail): differential mode
-    
-        -- Set Either: --
-
-        sample rate (Hz) = ScanFrequency * NumChannels
-
-        - `ScanFrequency`: The frequency in Hz to scan the channel list
-
-        -- OR --
-
-        The actual frequency is equal to: frequency=clock/ScanInterval
-
-        - `SamplePerPacket`: how many samples to make per packet
-        - `InternalStreamClockFrequency` int: 1 = 4Mhz or 0 = 48Mhz
-        - `DivideClockBy256` boolean: If true then deivide clock by 256
-        - `ScanInterval` int: How often to scan
-
-        There are two options for frequency:
-
-        either set ScanFrequency _or_ sampleperpacket, internalstreamClockFrequency, divideClockBy256, and ScanInterval
-        
-        '''
-        self.__streamConfigurationDetails = {
-            # The number of channels (normally two channel per sensor one positive and one negative)
-            "NumChannels": 12,
-            # positive channels
-            "ChannelNumbers": [48, 49, 50, 51, 64, 65, 66, 67, 68, 80, 81, 82],
-            # 
-            "ChannelOptions": [0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A],
-            #
-            "SettlingFactor": 1,
-            #
-            "ResolutionIndex": 0,
-            #
-            "ScanFrequency": 12,
-            #
-            "SamplesPerPacket": 25,
-            #
-            "InternalStreamClockFrequency": 0,
-            #
-            "DivideClockBy256": True,
-            #
-            "ScanInterval": 1
-        }
-
-        try:
-            self.__calibrate()
-        except Exception as e:
-            self.__logger.error(f"Failed to calibrate: {e}")
-            traceback.print_exc(file=sys.stdout)
-            sys.exit(1)
-        
-        try:
-            self.__configure_stream()
-        except Exception as e:
-            self.__logger.error(f"Failed to configure stream: {e}")
-            traceback.print_exc(file=sys.stdout)
-            sys.exit(1)
+            try:
+                self.__configure_stream()
+                pass
+            except Exception as e:
+                self.__logger.error(f"Failed to configure stream: {e}")
+                traceback.print_exc(file=sys.stdout)
+                sys.exit(1)
 
 
     def set_stream_config_details(self, 
         resolution_index=0, 
         settling_factor=1, 
         channel_numbers=[],
-        channel_options=[]
+        channel_options=[],
+        scan_frequency=12,
+        samples_per_packet=25,
+        internal_stream_clock_frequency=1,
+        divide_clock_by_256=True,
+        scan_interval=1
     ):
+        self.__d.streamStop()
+
         self.__streamConfigurationDetails['ResolutionIndex'] = resolution_index
-        # self.__streamConfigurationDetails['NumChannels'] = 
+        self.__streamConfigurationDetails['NumChannels'] = len(channel_numbers)
+        self.__streamConfigurationDetails['SettlingFactor'] = settling_factor
+        self.__streamConfigurationDetails['ChannelNumbers'] = channel_numbers
+        self.__streamConfigurationDetails['ChannelOptions'] = channel_options
+        self.__streamConfigurationDetails['ScanFrequency'] = scan_frequency
+        self.__streamConfigurationDetails['SamplesPerPacket'] = samples_per_packet
+        self.__streamConfigurationDetails['InternalStreamClockFrequency'] = internal_stream_clock_frequency
+        self.__streamConfigurationDetails['DivideClockBy256'] = divide_clock_by_256
+        self.__streamConfigurationDetails['ScanInterval'] = scan_interval
+
+        try:
+            self.__configure_stream()
+        except Exception as e:
+            self.__logger.error(f"Failed to configure stream: {e}")
+            traceback.print_exc(file=sys.stdout)
+            sys.exit(1)
 
 
     def __configure_log(self):
@@ -208,8 +171,31 @@ class LabJackU6Driver:
             except Exception as e:
                 self.__logger.error("Failed to stop stream: %s %s" % (type(e), e))
 
-    async def voltageToSensorValues():
+
+    def voltageToSensorValues():
         """
         Name: 
             LabJackU6Driver.processVoltages
         """
+
+
+        return
+
+
+    async def mock_stream(self, queue: asyncio.LifoQueue):
+        while True:
+            await queue.put({
+                "T_RUN_TANK": round(random.uniform(6,10), 3),
+                "T_INJECTOR": round(random.uniform(6,10), 3),
+                "T_COMBUSTION_CHAMBER": round(random.uniform(6,10), 3),
+                "T_POST_COMBUSTION": round(random.uniform(6,10), 3),
+                "P_N2O_FLOW": round(random.uniform(6,10), 3),
+                "P_N2_FLOW": round(random.uniform(6,10), 3),
+                "P_RUN_TANK": round(random.uniform(6,10), 3),
+                "P_INJECTOR": round(random.uniform(6,10), 3),
+                "P_COMBUSTION_CHAMBER": round(random.uniform(6,10), 3),
+                "L_RUN_TANK": round(random.uniform(6,10), 3),
+                "L_TRUST": round(random.uniform(6,10), 3),
+                "SHUNT": round(random.uniform(6,10), 3)
+            })
+            await asyncio.sleep(1)

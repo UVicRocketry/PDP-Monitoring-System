@@ -13,21 +13,21 @@ def main() -> None:
         Without two servers the one connection will be overloaded by traffic close abruptly.
     '''
     instrumentation = None
-    wss_instrumenation = None
+    wss_instrumentation = None
     
     # the queues are used to send commands and feecback from task to task. 
     # ex: wss (command) -> serail(move valve); serail (feedback) -> wss (feedback) 
     instrumentation_feedback_queue = asyncio.LifoQueue()
 
     try:
-        instrumentation = LabJackU6Driver()
+        instrumentation = LabJackU6Driver(test_mode=True)
         print("instrumentation Driver configured")
     except Exception as e:
         print(f"Failed to initialize LabJackU6Driver: {e}")
         exit(1)
 
     try:
-        wss_instrumenation = WebSocketServer(port=INSTRUMENTATION_PORT)
+        wss_instrumentation = WebSocketServer(port=INSTRUMENTATION_PORT)
     except Exception as e:
         print(f"Failed to initialize websocket server: {e}")
         exit(1)
@@ -35,13 +35,13 @@ def main() -> None:
     event_loop = asyncio.get_event_loop() 
 
     # Websocket server for instrumentation
-    event_loop.create_task(wss_instrumenation.start())
+    event_loop.create_task(wss_instrumentation.start())
 
     # Instrumentation
-    event_loop.create_task(instrumentation.stream(instrumentation_feedback_queue))
+    event_loop.create_task(instrumentation.mock_stream(instrumentation_feedback_queue))
     
     # websockets handler
-    event_loop.create_task(wss_instrumenation.instrumentation_wss_handler(instrumentation_feedback_queue))
+    event_loop.create_task(wss_instrumentation.instrumentation_wss_handler(instrumentation_feedback_queue))
 
     
     try:

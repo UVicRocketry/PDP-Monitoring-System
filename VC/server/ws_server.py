@@ -11,7 +11,7 @@ __name__ = "WebSocketServer"
 OS = platform.system()
 
 HOST = "192.168.0.1" if OS == "Linux" else "localhost"
-DEFTAULT_PORT = 8888
+DEFAULT_PORT = 8888
 
 class Command:
     def __init__(self, command, valve, action):
@@ -36,7 +36,7 @@ class InstrumentationFeedback:
 class WebSocketServer:
     def __init__(self, port=None):
         if port is None:
-            self.__port = PORT
+            self.__port = DEFAULT_PORT
         else: 
             self.__port = port
 
@@ -125,6 +125,8 @@ class WebSocketServer:
             if self.__wss_instance is not None:
                 try:
                     feedback = await queue.get()
+
+                    print(feedback)
                     await self.__wss_instance.send(json.dumps({
                         "identifier": "INSTRUMENTATION",
                         "data": feedback
@@ -134,7 +136,7 @@ class WebSocketServer:
                     print("queue empty")
                     await asyncio.sleep(0)
                     return
-            await asyncio.sleep(2)
+            await asyncio.sleep(0)
 
     
     async def send_message(self, message):
