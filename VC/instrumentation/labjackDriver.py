@@ -1,6 +1,7 @@
 import sys
 import traceback
 from datetime import datetime as dt
+import time
 from enum import Enum
 import u6
 import logging
@@ -10,7 +11,8 @@ from copy import deepcopy
 import threading
 import asyncio
 import random
-from .labjackconfig import SensorCannelMap, GAIN_OFFSETS, default_stream_Config_details
+import json
+from labjackconfig import SensorCannelMap, GAIN_OFFSETS, default_stream_Config_details
 
 import matplotlib.pyplot as plt
 
@@ -33,6 +35,7 @@ class LabJackU6Driver:
         self.__logger = logging.getLogger(__name__)
         self.__log_handler = None
         self.__configure_log()
+
 
         # see config.py for more information on the stream configuration details
         self.__streamConfigurationDetails = default_stream_Config_details
@@ -134,7 +137,7 @@ class LabJackU6Driver:
             print('failed to initalize stream due to: {e}')
       
 
-    async def stream(self, queue: asyncio.LifoQueue):
+    async def stream(self):
         """
         Name:
             LabJackU6Driver.__stream() -> None
@@ -142,28 +145,29 @@ class LabJackU6Driver:
             Starts streaming sensor data from the LabJack U6 device and processes it.
         """
         try:
+            # date = dt.datetime.now()
             self.__d.streamStart()
-            while True:
-                returnDict = next(self.__d.streamData(convert=False))
-                if returnDict is None:
-                    self.__logger.error(InstrumentationLogPhrases.FAILED_TO_STREAM)
-    
-                try:
-                    output_voltage = self.__d.processStreamData(returnDict['result']) 
-                    formatted_output_voltage = {}
-                    self.__logger.info(str(output_voltage))
-                    
-                    for key in output_voltage:
-                        #take the average of the output voltage
-                        averaged = sum(output_voltage[key]) / len(output_voltage[key])
-                        formatted_output_voltage[SensorCannelMap[key]] = averaged
-                    
-                    print(f'labjackdriver: {formatted_output_voltage}')
-                    await queue.put(formatted_output_voltage)
-                    await asyncio.sleep(1)
-
-                except Exception as e:
-                    print(f'Failed to process data: {e}')
+            with open(f"instrumentation-data.txt", 'a') as file:
+                print("file opened")
+                while True:
+                    returnDict = next(self.__d.streamData(convert=False))
+                    if returnDict is None:
+                        self.__logger.error(InstrumentationLogPhrases.FAILED_TO_STREAM)
+        
+                    try:
+                        output_voltage = self.__d.processStreamData(returnDict['result']) 
+                        formatted_output_voltage = {}
+                        self.__logger.info(str(output_voltage))
+                        
+                        for key in output_voltage:
+                            # take the average of the output voltage
+                            averaged = sum(output_voltage[key]) / len(output_voltage[key])
+                            formatted_output_voltage[SensorCannelMap[key]] = self.voltageToSensorValues(averaged, key)
+                            # formatted_output_voltage[SensorCannelMap[key]] = averaged
+                        file.write(f'{json.dumps(formatted_output_voltage)}\n')
+                        print(f'labjackdriver: {formatted_output_voltage}')
+                    except Exception as e:
+                        print(f'Failed to process data: {e}')
 
         except Exception as e:
             try:
@@ -171,15 +175,33 @@ class LabJackU6Driver:
             except Exception as e:
                 self.__logger.error("Failed to stop stream: %s %s" % (type(e), e))
 
-
-    def voltageToSensorValues():
+    def voltageToSensorValues(self, voltage, key):
         """
         Name: 
             LabJackU6Driver.processVoltages
         """
+        match SensorCannelMap[key][0]:
+            case "L" | "P": 
+                return GAIN_OFFSETS[SensorCannelMap[key]][0] * voltage + GAIN_OFFSETS[SensorCannelMap[key]][1]
+            case "T":
+                #list of coefficients for voltage to temperature formula
+                #these coefficients are valid from 500C to 1372C
+                C0 = 0
+                C1 = 25.08355
+                C2 = 0.07860106
+                C3 = -0.2503131
+                C4 = 0.08315270
+                C5 = -0.01228034
+                C6 = 0.0009804036
+                C7 = -0.00004413030
+                C8 = 0.000001057734
+                C9 = -0.00000001052755
 
-
-        return
+                #update later with this:
+                #see https://www.keysight.com/us/en/assets/9022-00195/miscellaneous/5306OSKR-MXD-5501-040107_2.htm
+                return C0 + C1*voltage + C2*voltage**2 + C3*voltage**3 + C4*voltage**4 + C5*voltage**5 + C6*voltage**6 + C7*voltage**7 + C8*voltage**8 + C9*voltage**9
+            case _: 
+                return voltage
 
 
     async def mock_stream(self, queue: asyncio.LifoQueue):

@@ -28,6 +28,7 @@ GAIN_OFFSETS = {
     "P_INJECTOR": (10170.95, 0),        # PSI
     "L_RUN_TANK": (2014.22, 0.8044),    # kg
     "L_TRUST": (466000, -25.8),         # N 
+    "P_COMBUSTION_CHAMBER": (1000000, 1)
 }
 
 '''
