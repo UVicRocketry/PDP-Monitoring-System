@@ -1,6 +1,16 @@
 import u6
 import json
 
+# Gains
+X1    = 0b00000000
+X10   = 0b00010000
+X100  = 0b00100000
+X1000 = 0b00110000
+
+# Channel mode
+SING = 0b00000000
+DIFF = 0b10000000
+
 '''
 NOTE:
   Only change the values between
@@ -87,27 +97,18 @@ streamConfig():
 
 '''
 
-# Gains
-X1    = 0b00000000
-X10   = 0b00010000
-X100  = 0b00100000
-X1000 = 0b00110000
-
-# Channel mode
-SINGLE = 0b00000000
-DIFF   = 0b10000000
-
 ######### BEGIN USER ADJUSTABLE ########
 
 scan_frequency   = 50
 resolution_index = 2
 settling_factor  = 0
-samples_per_packet = 1
-channel_settings = [(0, DIFF | X1000)]
+samples_per_packet = 2
+channel_settings = [(0, DIFF | X1000), # P_COMBUSTION_CHAMBER
+                    (2, SING | X1)]    # P_WXYZ
 
 # These gains should convert volts to the SI unit of the sensor
-PT_Comb_Gain = 10170.95  # [Pa/V] at 10V supply
-PT_WXYZ_Gain = 10000.00  # [Pa/V] at 10V supply
+GAIN_P_COMBUSTION_CHAMBER = 10170.95  # [Pa/V] at 10V supply
+GAIN_PT_WXYZ = 10000.00  # [Pa/V] at 10V supply
 
 #########  END USER ADJUSTABLE  ########
 
@@ -122,13 +123,17 @@ d.streamConfig(
         SettlingFactor  = settling_factor,
         SamplesPerPacket = samples_per_packet)
 
-# Avoid having to power cycle the LJ
+# Avoid having to power cycle the LJ on restart
 try:
     d.streamStop()
 except:
     pass
 
-# Stream
+if samples_per_packet < len(channel_settings):
+    raise ValueError \
+    ("samples_per_packet must be at least the number of channels!")
+
+# Stream data from the LJ
 d.streamStart()
 
 with open('instrumentation_data.txt', 'w') as file:
@@ -147,15 +152,19 @@ with open('instrumentation_data.txt', 'w') as file:
             values = d.processStreamData(reading['result'])
 
             # Extract values
-            PT_Comb = values['AIN0']
-            PT_WXYZ = values['AIN2']
+            P_COMBUSTION_CHAMBER = values['AIN0']
+            P_WXYZ = values['AIN2']
 
             # Convert voltage to sensor value in SI units and store in dict
-            converted['PT_Comb'] = (sum(PT_Comb)/len(PT_Comb))*PT_Comb_Gain
-            converted['PT_WXYZ'] = (sum(PT_WXYZ)/len(PT_WXYZ))*PT_WXYZ_Gain
+            converted['P_COMBUSTION_CHAMBER'] = \
+                    (sum(P_COMBUSTION_CHAMBER)/len(P_COMBUSTION_CHAMBER)) \
+                    *GAIN_P_COMBUSTION_CHAMBER
+
+            converted['P_WXYZ'] = (sum(P_WXYZ)/len(P_WXYZ))*GAIN_PT_WXYZ
 
             # Write to file so websocket can send to ground support
-            file.write(f'{json.dumps(formatted_output_voltage)}\n')
+            file.write(f'{json.dumps(converted)}\n')
+            print(converted)
 
 
 
