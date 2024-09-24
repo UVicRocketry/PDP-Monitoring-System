@@ -18,6 +18,9 @@ NOTE:
 
   #########  END USER ADJUSTABLE  ########
 
+  (If you add a new sensor you will need to adjust other code too)
+
+
 Overview:
 
   LabJackPython provides wraps the low level functions for communicating
@@ -92,25 +95,65 @@ streamConfig():
       Set bit 7 for differential reading.
 
     Ex:
-      Channel 0 single ended with gain 10: (0, SINGLE | X10)
+      Channel 0 single ended with gain 10:  (0, SING | X10)
       Channel 0,1 differential with gain 1: (0, DIFF | X1)
 
 '''
 
-######### BEGIN USER ADJUSTABLE ########
+######### BEGIN USER ADJUSTABLE #########
 
-scan_frequency   = 50
+# Stream settings
+scan_frequency   = 25
 resolution_index = 2
-settling_factor  = 0
-samples_per_packet = 2
-channel_settings = [(0, DIFF | X1000), # P_COMBUSTION_CHAMBER
-                    (2, SING | X1)]    # P_WXYZ
+settling_factor  = 2
+samples_per_packet = 50
+channel_settings = [(86, DIFF | X1000), # L_RUN_TANK (SEEMS GOOD. CHECK CAL)
+                    (87, DIFF | X1000), # L_THRUST (VERY NOISY)
 
-# These gains should convert volts to the SI unit of the sensor
-GAIN_P_COMBUSTION_CHAMBER = 10170.95  # [Pa/V] at 10V supply
-GAIN_PT_WXYZ = 10000.00  # [Pa/V] at 10V supply
+                    (82, DIFF | X100),  # P_INJECTOR (GOOD!)
+                    (85, DIFF | X100),  # P_COMB_CHMBR
+                    (84, DIFF | X100),  # P_N2O_FLOW
+                    (83, DIFF | X100),  # P_N2_FLOW
+                    (81, DIFF | X100),  # P_RUN_TANK
+                    
+                    (55, SING | X100),  # T_COMB_CHMBR
+                    (53, SING | X100),  # T_POST_COMB_CHMBR
+                    (57, SING | X100),  # T_INJECTOR
+                    (49, SING | X1000)]  # T_RUN_TANK 
 
-#########  END USER ADJUSTABLE  ########
+# These gains and offsets convert raw volts to the SI unit of the sensor
+
+# 6895 converts PSI to Pa. *2 since running on 5V supply rather than 10V
+GAIN_P_COMB_CHMBR = 2*6895*0.0       # [Pa/V] at 10V supply TODO: Not in use
+GAIN_P_N2O_FLOW   = 2*6895*9982.03   # [Pa/V] at 10V supply 
+GAIN_P_N2_FLOW    = 2*6895*9936.41   # [Pa/V] at 10V supply
+GAIN_P_RUN_TANK   = 2*6895*10206.74  # [Pa/V] at 10V supply
+GAIN_P_INJECTOR   = 2*6895*10170.95  # [Pa/V] at 10V supply
+
+GAIN_L_RUN_TANK   = 2014.22   # [N/V]  at 5V supply
+GAIN_L_THRUST     = 466000    # [N/V]  at 5V supply 
+
+OFFSET_L_THRUST   = -25.8     # [N] # TODO double check
+OFFSET_L_RUN_TANK = -5.8      # [N] # TODO add 
+
+# Channel mapping from LJ to sensor
+CHAN_L_RUN_TANK   = 'AIN86'
+CHAN_L_THRUST     = 'AIN87'
+
+CHAN_P_COMB_CHMBR = 'AIN85'
+CHAN_P_N2O_FLOW   = 'AIN84'
+CHAN_P_N2_FLOW    = 'AIN83'
+CHAN_P_RUN_TANK   = 'AIN81'
+CHAN_P_INJECTOR   = 'AIN82'
+
+CHAN_T_RUN_TANK   = 'AIN49'
+CHAN_T_INJECTOR   = 'AIN57'
+CHAN_T_COMB_CHMBR = 'AIN55'
+CHAN_T_POST_COMB  = 'AIN53'
+
+CHAN_SHUNT        = 'AIN82' # Not implemented yet on cart
+
+#########  END USER ADJUSTABLE  #########
 
 # Set up the stream
 d = u6.U6()
@@ -131,7 +174,9 @@ except:
 
 if samples_per_packet < len(channel_settings):
     raise ValueError \
-    ("samples_per_packet must be at least the number of channels!")
+            ("samples_per_packet: (" + str(samples_per_packet) + \
+             ") must be at least the number of channels: (" + \
+             str(len(channel_settings)) + ")!")
 
 # Stream data from the LJ
 d.streamStart()
@@ -151,20 +196,53 @@ with open('instrumentation_data.txt', 'w') as file:
 
             values = d.processStreamData(reading['result'])
 
-            # Extract values
-            P_COMBUSTION_CHAMBER = values['AIN0']
-            P_WXYZ = values['AIN2']
+            # Extract values from each channel
+            P_INJECTOR   = values[CHAN_P_INJECTOR]
+            P_COMB_CHMBR = values[CHAN_P_COMB_CHMBR]
+            P_N2O_FLOW   = values[CHAN_P_N2O_FLOW]
+            P_N2_FLOW    = values[CHAN_P_N2_FLOW]
+            P_RUN_TANK   = values[CHAN_P_RUN_TANK]
+
+            L_RUN_TANK   = values[CHAN_L_RUN_TANK]
+            L_THRUST     = values[CHAN_L_THRUST]
+
+            T_RUN_TANK   = values[CHAN_T_RUN_TANK]
+            T_INJECTOR   = values[CHAN_T_INJECTOR]
+            T_COMB_CHMBR = values[CHAN_T_COMB_CHMBR]
+            T_POST_COMB  = values[CHAN_T_POST_COMB]
+
+            SHUNT        = values[CHAN_SHUNT]
 
             # Convert voltage to sensor value in SI units and store in dict
-            converted['P_COMBUSTION_CHAMBER'] = \
-                    (sum(P_COMBUSTION_CHAMBER)/len(P_COMBUSTION_CHAMBER)) \
-                    *GAIN_P_COMBUSTION_CHAMBER
+            converted['P_INJECTOR'] = \
+            (sum(P_INJECTOR)/len(P_INJECTOR))*GAIN_P_INJECTOR
 
-            converted['P_WXYZ'] = (sum(P_WXYZ)/len(P_WXYZ))*GAIN_PT_WXYZ
+            converted['P_COMB_CHMBR'] = \
+            (sum(P_COMB_CHMBR)/len(P_COMB_CHMBR))*GAIN_P_COMB_CHMBR
+
+            converted['P_N2O_FLOW'] = \
+            (sum(P_N2O_FLOW)/len(P_N2O_FLOW))*GAIN_P_N2O_FLOW
+
+            converted['P_N2_FLOW'] = \
+            (sum(P_N2_FLOW)/len(P_N2_FLOW))*GAIN_P_N2_FLOW
+
+            converted['P_RUN_TANK'] = \
+            (sum(P_RUN_TANK)/len(P_RUN_TANK))*GAIN_P_RUN_TANK
+
+            converted['L_RUN_TANK'] = \
+            (sum(L_RUN_TANK)/len(L_RUN_TANK))*GAIN_L_RUN_TANK+OFFSET_L_RUN_TANK
+
+            converted['L_THRUST'] = \
+            (sum(L_THRUST)/len(L_THRUST))*GAIN_L_THRUST+OFFSET_L_THRUST
+
+            # TODO these need to be proper thermocouple conversions
+            converted['T_RUN_TANK'] = (sum(T_RUN_TANK)/len(T_RUN_TANK))
+            converted['T_INJECTOR'] = (sum(T_INJECTOR)/len(T_INJECTOR))
+            converted['T_COMB_CHMBR'] = (sum(T_COMB_CHMBR)/len(T_COMB_CHMBR))
+            converted['T_POST_COMB'] = (sum(T_POST_COMB)/len(T_POST_COMB))
 
             # Write to file so websocket can send to ground support
             file.write(f'{json.dumps(converted)}\n')
-            print(converted)
 
 
 
