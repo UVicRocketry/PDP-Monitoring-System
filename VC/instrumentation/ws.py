@@ -90,14 +90,17 @@ class WebSocketServer:
             Handles the websocket requests and serial feedback to send over the websocket
         '''
         print("instrumentation handler")
-        with open('tmp.txt', 'r') as file:
-            while True:
-                packet = file.read()
-                print(packet)
-                # await websocket.send({
-                #     "identifier": "INSTRUMENTATION",
-                #     "data": json.loads(packet)
-                # })
+        while True:
+            with open('tmp.txt', 'r') as file:
+                lines = file.readlines()
+                # if len(lines) > 0:
+                #     print(f'{lines[0]}, {len(lines)}')
+                if len(lines) > 1:
+                    await websocket.send(json.dumps({
+                        "identifier": "INSTRUMENTATION",
+                        "data": json.loads(lines[0])
+                    }))
+                    await asyncio.sleep(0.1)
     
 
     async def wss_reception_handler(self, queue):
@@ -169,3 +172,7 @@ class WebSocketServer:
         async with websockets.serve(self.__instrumentation_handler, self.__host, self.__port):
             await asyncio.Future()
         
+
+ws = WebSocketServer("instrumentation")
+
+asyncio.run(ws.start_instrumentation())

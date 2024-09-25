@@ -244,6 +244,9 @@ with open('instrumentation_data.txt', 'w') as file:
             # Write to file so websocket can send to ground support
             file.write(f'{json.dumps(converted)}\n')
 
+            with open('tmp.txt', 'w') as tmp:
+              tmp.write(f'{json.dumps(converted)}')
+              tmp.write('\n!')
 
 
 
