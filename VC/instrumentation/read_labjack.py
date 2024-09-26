@@ -75,7 +75,7 @@ streamConfig():
     impedance. 
     See https://support.labjack.com/docs/analog-input-settling-time-app-note
  
-  channel_settings [0, 1]:
+  channel_settings[]:
     Channels to read from and their settings. For differential pairs, only
     specifiy the positive channel (even numbered). OR a channel mode and 
     gain value together to conveniently set the options for that channel.
@@ -94,10 +94,36 @@ streamConfig():
     
       Set bit 7 for differential reading.
 
-    Ex:
-      Channel 0 single ended with gain 10:  (0, SING | X10)
-      Channel 0,1 differential with gain 1: (0, DIFF | X1)
 
+Adding a Sensor: 
+    1) Add a new tuple to channel_settings with the LJ pin the sensor is
+       connected to. For single ended sensors, this is just the single
+       sensor pin. For differential, it is the positive channel. LJ will
+       automatically configure the negative channel.
+
+       The tuple should have the form: (CHAN_NUM, SETTINGS)
+       Ex: Channel 0 single ended with gain 10:  (0, SING | X10)
+           Channel 2,3 differential with gain 1: (2, DIFF | X1)
+
+    2) Add a new GAIN variable and OFFSET variable if needed that converts
+       the raw voltage from the sensor to the appropriate SI unit.
+
+    3) Add a new variable (called CHAN_XXX where XXX refers to the sensor name)
+       to refer to the pin the sensor is connected to. Again for single ended
+       just use the pin, and differential the positive channel. This is used
+       for lookup in the LJ results dictionary. The LJ naming convention is 
+       'AINX' where X is the pin number (1, 2, .. 56 etc)
+
+    4) Add a few lines of code to read and convert the voltage to SI:
+
+       if reading is not None:
+
+           # Add and fill out this line
+           SENSOR_NAME = values[CHAN_XXX]
+           converted['SENSOR_NAME'] = GAIN*SENSOR_NAME + OFFSET # etc...
+
+        Thats it, Have fun with your new sensor!
+    
 '''
 
 ######### BEGIN USER ADJUSTABLE #########
@@ -166,20 +192,26 @@ d.streamConfig(
         SettlingFactor  = settling_factor,
         SamplesPerPacket = samples_per_packet)
 
-# Avoid having to power cycle the LJ on restart
-try:
-    d.streamStop()
-except:
-    pass
-
 if samples_per_packet < len(channel_settings):
     raise ValueError \
             ("samples_per_packet: (" + str(samples_per_packet) + \
              ") must be at least the number of channels: (" + \
              str(len(channel_settings)) + ")!")
 
+# Avoid having to power cycle the LJ on restart
+try:
+    d.streamStop()
+except LowlevelErrorException as e:
+    print("Tried to stop stream that wasn't started producing error:\n")
+    print(str(e))
+
 # Stream data from the LJ
-d.streamStart()
+try:
+    d.streamStart()
+except LabJackException as e:
+    print("Failed to start LabJack")
+    print(str(e))
+    exit()
 
 with open('instrumentation_data.txt', 'w') as file:
 
@@ -247,22 +279,4 @@ with open('instrumentation_data.txt', 'w') as file:
             with open('tmp.txt', 'w') as tmp:
               tmp.write(f'{json.dumps(converted)}')
               tmp.write('\n!')
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
