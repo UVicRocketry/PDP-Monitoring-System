@@ -78,7 +78,7 @@ streamConfig():
  
   channel_settings[]:
     Channels to read from and their settings. For differential pairs, only
-    specifiy the positive channel (even numbered). OR a channel mode and 
+    specify the positive channel (even numbered). OR a channel mode and 
     gain value together to conveniently set the options for that channel.
 
     Each channel has options that can be set with the ChannelOptions byte.
@@ -237,7 +237,7 @@ except Exception as e:
 # Stream data from the LJ
 try:
     d.streamStart()
-except LabJackException as e:
+except Exception as e:
     print("Failed to start LabJack")
     print(str(e))
     exit()
@@ -358,5 +358,3 @@ with open('instrumentation_data.txt', 'w') as file:
             with open('tmp.txt', 'w') as tmp:
               tmp.write(f'{json.dumps(converted)}')
               tmp.write('\n!')
-
-
