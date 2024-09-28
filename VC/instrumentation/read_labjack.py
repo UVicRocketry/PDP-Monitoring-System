@@ -225,22 +225,18 @@ if samples_per_packet < len(channel_settings):
              ") must be at least the number of channels: (" + \
              str(len(channel_settings)) + ")!")
 
-
-
-# Avoid having to power cycle the LJ on restart
-try:
-    d.streamStop()
-except Exception as e:
-    print("Tried to stop stream that wasn't started producing error:\n")
-    print(str(e))
-
 # Stream data from the LJ
 try:
     d.streamStart()
 except Exception as e:
     print("Failed to start LabJack")
     print(str(e))
+
+if d is None:
+    print("No LabJack device connected. Exiting...")
     exit()
+else:
+    d.streamStart()
 
 # Function to turn thermocouple voltages to kelvin
 def v_to_K(voltage):
@@ -290,65 +286,66 @@ def v_to_K(voltage):
    
     return (tempC + 273.15)
 
-with open('instrumentation_data.txt', 'w') as file:
+try:
+    with open('instrumentation_data.txt', 'w') as file:
 
-    # Contains sensor values in SI units
-    converted = {}
+        # Contains sensor values in SI units
+        converted = {}
 
-    for reading in d.streamData(convert=False):
+        for reading in d.streamData(convert=False):
 
-        # Reading is a dict of many things, one of which is the
-        # 'result' which can be passed to processStreamData() to
-        # give voltages.
+            # Reading is a dict of many things, one of which is the
+            # 'result' which can be passed to processStreamData() to
+            # give voltages.
 
-        if reading is not None:
+            if reading is not None:
 
-            values = d.processStreamData(reading['result'])
+                values = d.processStreamData(reading['result'])
 
-            # Extract values from each channel
-            P_INJECTOR   = values[CHAN_P_INJECTOR]
-            P_COMB_CHMBR = values[CHAN_P_COMB_CHMBR]
-            P_N2O_FLOW   = values[CHAN_P_N2O_FLOW]
-            P_N2_FLOW    = values[CHAN_P_N2_FLOW]
-            P_RUN_TANK   = values[CHAN_P_RUN_TANK]
+                # Extract values from each channel
+                P_INJECTOR   = values[CHAN_P_INJECTOR]
+                P_COMB_CHMBR = values[CHAN_P_COMB_CHMBR]
+                P_N2O_FLOW   = values[CHAN_P_N2O_FLOW]
+                P_N2_FLOW    = values[CHAN_P_N2_FLOW]
+                P_RUN_TANK   = values[CHAN_P_RUN_TANK]
 
-            L_RUN_TANK   = values[CHAN_L_RUN_TANK]
-            L_THRUST     = values[CHAN_L_THRUST]
+                L_RUN_TANK   = values[CHAN_L_RUN_TANK]
+                L_THRUST     = values[CHAN_L_THRUST]
 
-            T_RUN_TANK   = values[CHAN_T_RUN_TANK]
-            T_INJECTOR   = values[CHAN_T_INJECTOR]
-            T_COMB_CHMBR = values[CHAN_T_COMB_CHMBR]
-            T_POST_COMB  = values[CHAN_T_POST_COMB]
+                T_RUN_TANK   = values[CHAN_T_RUN_TANK]
+                T_INJECTOR   = values[CHAN_T_INJECTOR]
+                T_COMB_CHMBR = values[CHAN_T_COMB_CHMBR]
+                T_POST_COMB  = values[CHAN_T_POST_COMB]
 
-            SHUNT        = values[CHAN_SHUNT]
+                SHUNT        = values[CHAN_SHUNT]
 
-            # Convert voltage to sensor value in SI units and store in dict
-            converted['P_INJECTOR'] = \
-            (sum(P_INJECTOR)/len(P_INJECTOR))*GAIN_P_INJECTOR
+                # Convert voltage to sensor value in SI units and store in dict
+                converted['P_INJECTOR'] = \
+                (sum(P_INJECTOR)/len(P_INJECTOR))*GAIN_P_INJECTOR
 
-            converted['P_COMB_CHMBR'] = \
-            (sum(P_COMB_CHMBR)/len(P_COMB_CHMBR))*GAIN_P_COMB_CHMBR
+                converted['P_COMB_CHMBR'] = \
+                (sum(P_COMB_CHMBR)/len(P_COMB_CHMBR))*GAIN_P_COMB_CHMBR
 
-            converted['P_N2O_FLOW'] = \
-            (sum(P_N2O_FLOW)/len(P_N2O_FLOW))*GAIN_P_N2O_FLOW
+                converted['P_N2O_FLOW'] = \
+                (sum(P_N2O_FLOW)/len(P_N2O_FLOW))*GAIN_P_N2O_FLOW
 
-            converted['P_N2_FLOW'] = \
-            (sum(P_N2_FLOW)/len(P_N2_FLOW))*GAIN_P_N2_FLOW
+                converted['P_N2_FLOW'] = \
+                (sum(P_N2_FLOW)/len(P_N2_FLOW))*GAIN_P_N2_FLOW
 
-            converted['P_RUN_TANK'] = \
-            (sum(P_RUN_TANK)/len(P_RUN_TANK))*GAIN_P_RUN_TANK
+                converted['P_RUN_TANK'] = \
+                (sum(P_RUN_TANK)/len(P_RUN_TANK))*GAIN_P_RUN_TANK
 
-            converted['L_RUN_TANK'] = \
-            (sum(L_RUN_TANK)/len(L_RUN_TANK))*GAIN_L_RUN_TANK+OFFSET_L_RUN_TANK
+                converted['L_RUN_TANK'] = \
+                (sum(L_RUN_TANK)/len(L_RUN_TANK))*GAIN_L_RUN_TANK+OFFSET_L_RUN_TANK
 
-            converted['L_THRUST'] = \
-            (sum(L_THRUST)/len(L_THRUST))*GAIN_L_THRUST+OFFSET_L_THRUST
+                converted['L_THRUST'] = \
+                (sum(L_THRUST)/len(L_THRUST))*GAIN_L_THRUST+OFFSET_L_THRUST
 
-            # Thermocouples
-            converted['T_RUN_TANK'] = v_to_K(sum(T_RUN_TANK)/len(T_RUN_TANK))
-            converted['T_INJECTOR'] = v_to_K(sum(T_INJECTOR)/len(T_INJECTOR))
-            converted['T_COMB_CHMBR'] = v_to_K(sum(T_COMB_CHMBR)/len(T_COMB_CHMBR))
-            converted['T_POST_COMB'] = v_to_K(sum(T_POST_COMB)/len(T_POST_COMB))
+                # Thermocouples
+                converted['T_RUN_TANK'] = v_to_K(sum(T_RUN_TANK)/len(T_RUN_TANK))
+                converted['T_INJECTOR'] = v_to_K(sum(T_INJECTOR)/len(T_INJECTOR))
+                converted['T_COMB_CHMBR'] = v_to_K(sum(T_COMB_CHMBR)/len(T_COMB_CHMBR))
+                converted['T_POST_COMB'] = v_to_K(sum(T_POST_COMB)/len(T_POST_COMB))
 
             print(f'v:{sum(T_RUN_TANK)/len(T_RUN_TANK)}, t: {v_to_K(sum(T_RUN_TANK)/len(T_RUN_TANK))}')
 
@@ -358,3 +355,9 @@ with open('instrumentation_data.txt', 'w') as file:
             with open('tmp.txt', 'w') as tmp:
               tmp.write(f'{json.dumps(converted)}')
               tmp.write('\n!')
+except:
+    print("Interrupt signal received!")
+finally:
+    d.streamStop()
+    print("Stream stopped.\n")
+    d.close()
