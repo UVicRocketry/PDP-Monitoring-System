@@ -1,5 +1,5 @@
 import asyncio
-from ..server.ws_server import WebSocketServer
+from server.wss import WebSocketServer
 
 __name__ = "LJWebsocket"
 

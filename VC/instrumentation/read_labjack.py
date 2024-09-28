@@ -226,12 +226,6 @@ if samples_per_packet < len(channel_settings):
              str(len(channel_settings)) + ")!")
 
 # Stream data from the LJ
-try:
-    d.streamStart()
-except Exception as e:
-    print("Failed to start LabJack")
-    print(str(e))
-
 if d is None:
     print("No LabJack device connected. Exiting...")
     exit()

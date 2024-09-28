@@ -93,8 +93,8 @@ class WebSocketServer:
             Handles the websocket requests and serial feedback to send over the websocket
         '''
         print("instrumentation handler")
-        with open('tmp.txt', 'r') as file:
-            while True:
+        while True:
+            with open('instrumentation/tmp.txt', 'r') as file:
                 lines = file.readlines()
                 if len(lines) > 1:
                     await websocket.send(json.dumps({
