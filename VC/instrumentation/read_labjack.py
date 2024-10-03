@@ -280,16 +280,18 @@ def v_to_K(voltage):
    
     return (tempC + 273.15)
 
+# Log to data files
+file_num = 0 # Incremented to split data files into managable chuncks.
+lines =    0 # Limit data files to certain number of lines
+file = open('data_' + "{:03d}".format(file_num) + '.txt', 'w')
+
 try:
     # Contains sensor values in SI units
     converted = {}
 
-    file_num = 0 # Incremented to split data files into managable chuncks.
-    lines =    0 # Limit data files to certain number of lines
-    file = open('data_' + "{:03d}".format(file_num) + '.txt', 'w')
-
     for reading in d.streamData(convert=False):
 
+        # Increment data file
         if lines >= 100000:
             lines = 0
             file.close()
@@ -361,6 +363,7 @@ try:
 except:
     print("Interrupt signal recieved!")
 finally:
+    file.close()
     d.streamStop()
     print("Stream stopped.\n")
     d.close()
