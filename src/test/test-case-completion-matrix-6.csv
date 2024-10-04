@@ -1,0 +1,10 @@
+Test Case ID,Priority type,Priority importance,zeta
+TC-MC-001,2,2,16.0
+TC-MC-002,2,3,24.0
+TC-MC-003,2,1,8.0
+UT-MC-001,1,1,4.0
+UT-MC-002,1,2,8.0
+UT-MC-003,1,3,12.0
+UT-MC-004,1,2,8.0
+UT-MC-005,1,2,8.0
+UT-MC-006,1,3,12.0
