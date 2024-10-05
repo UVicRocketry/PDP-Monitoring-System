@@ -1,12 +1,12 @@
-import u6
+# Get voltage of cold junction of LabJack
+def get_ref_voltage(T_cold_junction_K):
 
+    # T_cold_junction is in K from: d.getTemperature()
 
-d = u6.U6()
+    # Coeffs expect Celsius 
+    Tref = T_cold_junction_K - 273.15
 
-#Get starting reference temp of LabJack
-def get_ref_temp():
-    Tref = d.getTemperature() - 273.15
-
+    # For 0C to 1372C at reduced accuracy
     c0 = -1.7600413686 * 10**-2
     c1 = 3.8921204975 * 10**-2
     c2 = 1.8558770032 * 10**-5
@@ -18,21 +18,26 @@ def get_ref_temp():
     c8 = 9.7151147152 * 10**-23
     c9 = -1.2104721275 * 10**-26
 
-    voltage_reference = c0 + \
-                        c1*Tref + \
-                        c2*Tref**2 + \
-                        c3*Tref**3 + \
-                        c4*Tref**4 + \
-                        c5*Tref**5 + \
-                        c6*Tref**6 + \
-                        c7*Tref**7 + \
-                        c8*Tref**8 + \
-                        c9*Tref**9
-    return voltage_reference
+    mV = c0 + \
+         c1*Tref + \
+         c2*Tref**2 + \
+         c3*Tref**3 + \
+         c4*Tref**4 + \
+         c5*Tref**5 + \
+         c6*Tref**6 + \
+         c7*Tref**7 + \
+         c8*Tref**8 + \
+         c9*Tref**9
 
-#Function to turn thermocouple voltages to kelvin
-def v_to_K(voltage, ref_voltage = 0):
-    voltage_actual = voltage + ref_voltage
+    # This computes the voltage in mV so convert to V
+    return mV/1000
+
+# Function to turn thermocouple voltages to kelvin
+def V_to_K(tc_voltage, ref_voltage):
+
+    voltage = (tc_voltage+ref_voltage)
+
+    # Ranges based on volts and celsius
     if voltage > 0.020644 and voltage < 0.054886:
         C0 = -131.8058
         C1 = 48.30222
@@ -69,17 +74,17 @@ def v_to_K(voltage, ref_voltage = 0):
     else:
        return 0
     
-    voltage_actual = voltage_actual*1000
-
+    # Coeffs expect mV
+    mV_voltage = voltage * 1000
     tempC = C0 + \
-            C1*voltage_actual + \
-            C2*voltage_actual**2 + \
-            C3*voltage_actual**3 + \
-            C4*voltage_actual**4 + \
-            C5*voltage_actual**5 + \
-            C6*voltage_actual**6 + \
-            C7*voltage_actual**7 + \
-            C8*voltage_actual**8 + \
-            C9*voltage_actual**9
+            C1*mV_voltage + \
+            C2*mV_voltage**2 + \
+            C3*mV_voltage**3 + \
+            C4*mV_voltage**4 + \
+            C5*mV_voltage**5 + \
+            C6*mV_voltage**6 + \
+            C7*mV_voltage**7 + \
+            C8*mV_voltage**8 + \
+            C9*mV_voltage**9
    
     return (tempC + 273.15)

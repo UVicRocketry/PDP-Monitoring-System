@@ -120,7 +120,7 @@ channel_settings = [(86, DIFF | X1000), # L_RUN_TANK (SEEMS GOOD. CHECK CAL)
                     (55, SING | X100),  # T_COMB_CHMBR
                     (53, SING | X100),  # T_POST_COMB_CHMBR
                     (57, SING | X100),  # T_INJECTOR
-                    (49, SING | X1000)]  # T_RUN_TANK 
+                    (49, SING | X100)]  # T_RUN_TANK 
 
 # These gains and offsets convert raw volts to the SI unit of the sensor
 
@@ -166,6 +166,11 @@ d.streamConfig(
         ResolutionIndex = resolution_index,
         SettlingFactor  = settling_factor,
         SamplesPerPacket = samples_per_packet)
+
+# Get cold junction voltage using LJ internal temp sensor
+V_ref = get_ref_voltage(d.getTemperature())
+print("T_ref in K: ", d.getTemperature())
+print("V_ref in V: ", V_ref)
 
 # Avoid having to power cycle the LJ on restart
 try:
@@ -236,11 +241,18 @@ with open('instrumentation_data.txt', 'w') as file:
             converted['L_THRUST'] = \
             (sum(L_THRUST)/len(L_THRUST))*GAIN_L_THRUST+OFFSET_L_THRUST
 
-            # TODO these need to be proper thermocouple conversions
-            converted['T_RUN_TANK'] = voltagetokelvin((sum(T_RUN_TANK)/len(T_RUN_TANK)))
-            converted['T_INJECTOR'] = voltagetokelvin((sum(T_INJECTOR)/len(T_INJECTOR)))
-            converted['T_COMB_CHMBR'] = voltagetokelvin((sum(T_COMB_CHMBR)/len(T_COMB_CHMBR)))
-            converted['T_POST_COMB'] = voltagetokelvin((sum(T_POST_COMB)/len(T_POST_COMB)))
+            # Thermocouples
+            converted['T_RUN_TANK'] = \
+                    V_to_K((sum(T_RUN_TANK)/len(T_RUN_TANK)), V_ref)
+
+            converted['T_INJECTOR'] = \
+                    V_to_K((sum(T_INJECTOR)/len(T_INJECTOR)), V_ref)
+
+            converted['T_COMB_CHMBR'] = \
+                    V_to_K((sum(T_COMB_CHMBR)/len(T_COMB_CHMBR)), V_ref)
+
+            converted['T_POST_COMB'] = \
+                    V_to_K((sum(T_POST_COMB)/len(T_POST_COMB)), V_ref)
 
             # Write to file so websocket can send to ground support
             file.write(f'{json.dumps(converted)}\n')
