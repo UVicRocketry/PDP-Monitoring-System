@@ -2,7 +2,7 @@
 
 The Propulsion Development Platform (PDP) Monitoring System is a web-based application that allows users to monitor the status of the engine controls and instrumentation. The PDP is a testbed for the development of propulsion systems, and the monitoring system is used to control valve actuation, monitor sensor readings, and record data. The monitoring system is designed to be used by engineers and technicians who are responsible for the operation of the PDP. 
 
-This repository contains the server for used on valve cart. The server runs off of a linux based ubuntu mini computer which acts as a middle man for controls and instrumentation. The server has a built in api that comminations with a client. A fork of [Ground Support](https://github.com/UVicRocketry/Ground-Support) was used for the client, however the api can accommodate any external client given it has a websocket connection. 
+This repository contains the server for used on valve cart. The server runs off of a linux based ubuntu mini computer which acts as a middle man for controls and instrumentation. The server has a built in websocket api that comminations with a client. The UI repo for this project is [Ground Support v2](https://github.com/klemie/PDP-Monitoring-System-UI), however the api can accommodate any external client given it has a websocket connection. 
 
 # Table of Contents
 
