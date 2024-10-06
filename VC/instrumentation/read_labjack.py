@@ -1,5 +1,6 @@
 import u6
 import json
+from thermocouple import *
 
 # Gains
 X1    = 0b00000000
@@ -219,6 +220,17 @@ d.streamConfig(
         SettlingFactor  = settling_factor,
         SamplesPerPacket = samples_per_packet)
 
+# Get cold junction voltage using LJ internal temp sensor
+V_ref = get_ref_voltage(d.getTemperature())
+print("T_ref in K: ", d.getTemperature())
+print("V_ref in V: ", V_ref)
+
+# Avoid having to power cycle the LJ on restart
+try:
+    d.streamStop()
+except:
+    pass
+
 if samples_per_packet < len(channel_settings):
     raise ValueError \
             ("samples_per_packet: (" + str(samples_per_packet) + \
@@ -329,29 +341,18 @@ try:
                 converted['P_RUN_TANK'] = \
                 (sum(P_RUN_TANK)/len(P_RUN_TANK))*GAIN_P_RUN_TANK
 
-                converted['L_RUN_TANK'] = \
-                (sum(L_RUN_TANK)/len(L_RUN_TANK))*GAIN_L_RUN_TANK+OFFSET_L_RUN_TANK
-
-                converted['L_THRUST'] = \
-                (sum(L_THRUST)/len(L_THRUST))*GAIN_L_THRUST+OFFSET_L_THRUST
-
                 # Thermocouples
-                converted['T_RUN_TANK'] = v_to_K(sum(T_RUN_TANK)/len(T_RUN_TANK))
-                converted['T_INJECTOR'] = v_to_K(sum(T_INJECTOR)/len(T_INJECTOR))
-                converted['T_COMB_CHMBR'] = v_to_K(sum(T_COMB_CHMBR)/len(T_COMB_CHMBR))
-                converted['T_POST_COMB'] = v_to_K(sum(T_POST_COMB)/len(T_POST_COMB))
+                converted['T_RUN_TANK'] = \
+                        V_to_K((sum(T_RUN_TANK)/len(T_RUN_TANK)), V_ref)
 
-            print(f'v:{sum(T_RUN_TANK)/len(T_RUN_TANK)}, t: {v_to_K(sum(T_RUN_TANK)/len(T_RUN_TANK))}')
+                converted['T_INJECTOR'] = \
+                        V_to_K((sum(T_INJECTOR)/len(T_INJECTOR)), V_ref)
 
-            # Write to file so websocket can send to ground support
-            file.write(f'{json.dumps(converted)}\n')
+                converted['T_COMB_CHMBR'] = \
+                        V_to_K((sum(T_COMB_CHMBR)/len(T_COMB_CHMBR)), V_ref)
 
-            with open('tmp.txt', 'w') as tmp:
-              tmp.write(f'{json.dumps(converted)}')
-              tmp.write('\n!')
-except:
-    print("Interrupt signal received!")
-finally:
-    d.streamStop()
-    print("Stream stopped.\n")
-    d.close()
+                converted['T_POST_COMB'] = \
+                        V_to_K((sum(T_POST_COMB)/len(T_POST_COMB)), V_ref)
+
+                # Write to file so websocket can send to ground support
+                file.write(f'{json.dumps(converted)}\n')
