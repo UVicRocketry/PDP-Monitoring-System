@@ -3,3 +3,4 @@ serial.log
 instrumenation.log
 ws-server.log
 *.pyc
+*.txt

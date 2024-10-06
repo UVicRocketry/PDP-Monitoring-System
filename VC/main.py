@@ -1,4 +1,4 @@
-from server.ws_server import WebSocketServer
+from server.wss import WebSocketServer
 from serialInterface.serialInterface import SerialInterface
 import asyncio
 
@@ -22,7 +22,7 @@ def main() -> None:
         exit(1)
 
     try:
-        wss = WebSocketServer()
+        wss = WebSocketServer("serial")
     except Exception as e:
         print(f"Failed to initialize websocket server: {e}")
         exit(1)
@@ -30,7 +30,7 @@ def main() -> None:
     event_loop = asyncio.get_event_loop() 
 
     # WebSocket server task
-    event_loop.create_task(wss.start())
+    event_loop.create_task(wss.start_serial())
     
     # Serial sending and receiving tasks
     event_loop.create_task(serial.receive_loop(serial_feedback_queue))

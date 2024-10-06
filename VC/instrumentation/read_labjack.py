@@ -12,6 +12,7 @@ X1000 = 0b00110000
 SING = 0b00000000
 DIFF = 0b10000000
 
+
 '''
 NOTE:
   Only change the values between
@@ -76,9 +77,9 @@ streamConfig():
     impedance. 
     See https://support.labjack.com/docs/analog-input-settling-time-app-note
  
-  channel_settings [0, 1]:
+  channel_settings[]:
     Channels to read from and their settings. For differential pairs, only
-    specifiy the positive channel (even numbered). OR a channel mode and 
+    specify the positive channel (even numbered). OR a channel mode and 
     gain value together to conveniently set the options for that channel.
 
     Each channel has options that can be set with the ChannelOptions byte.
@@ -95,10 +96,36 @@ streamConfig():
     
       Set bit 7 for differential reading.
 
-    Ex:
-      Channel 0 single ended with gain 10:  (0, SING | X10)
-      Channel 0,1 differential with gain 1: (0, DIFF | X1)
 
+Adding a Sensor: 
+    1) Add a new tuple to channel_settings with the LJ pin the sensor is
+       connected to. For single ended sensors, this is just the single
+       sensor pin. For differential, it is the positive channel. LJ will
+       automatically configure the negative channel.
+
+       The tuple should have the form: (CHAN_NUM, SETTINGS)
+       Ex: Channel 0 single ended with gain 10:  (0, SING | X10)
+           Channel 2,3 differential with gain 1: (2, DIFF | X1)
+
+    2) Add a new GAIN variable and OFFSET variable if needed that converts
+       the raw voltage from the sensor to the appropriate SI unit.
+
+    3) Add a new variable (called CHAN_XXX where XXX refers to the sensor name)
+       to refer to the pin the sensor is connected to. Again for single ended
+       just use the pin, and differential the positive channel. This is used
+       for lookup in the LJ results dictionary. The LJ naming convention is 
+       'AINX' where X is the pin number (1, 2, .. 56 etc)
+
+    4) Add a few lines of code to read and convert the voltage to SI:
+
+       if reading is not None:
+
+           # Add and fill out this line
+           SENSOR_NAME = values[CHAN_XXX]
+           converted['SENSOR_NAME'] = GAIN*SENSOR_NAME + OFFSET # etc...
+
+        Thats it, Have fun with your new sensor!
+    
 '''
 
 ######### BEGIN USER ADJUSTABLE #########
@@ -158,6 +185,32 @@ CHAN_SHUNT        = 'AIN82' # Not implemented yet on cart
 
 # Set up the stream
 d = u6.U6()
+
+#Get starting reference temp of LabJack
+Tref = d.getTemperature() - 273.15
+
+c0 = -1.7600413686 * 10**-2
+c1 = 3.8921204975 * 10**-2
+c2 = 1.8558770032 * 10**-5
+c3 = -9.9457592874 * 10**-8
+c4 = 3.1840945719 * 10**-10
+c5 = -5.6072844889 * 10**-13
+c6 = 5.6075059059 * 10**-16
+c7 = -3.2020720003 * 10**-19
+c8 = 9.7151147152 * 10**-23
+c9 = -1.2104721275 * 10**-26
+
+voltage_reference = c0 + \
+                    c1*Tref + \
+                    c2*Tref**2 + \
+                    c3*Tref**3 + \
+                    c4*Tref**4 + \
+                    c5*Tref**5 + \
+                    c6*Tref**6 + \
+                    c7*Tref**7 + \
+                    c8*Tref**8 + \
+                    c9*Tref**9
+
 d.streamConfig(
         ScanFrequency   = scan_frequency,
         ChannelNumbers  = [x[0] for x in channel_settings],
@@ -185,74 +238,121 @@ if samples_per_packet < len(channel_settings):
              str(len(channel_settings)) + ")!")
 
 # Stream data from the LJ
-d.streamStart()
+if d is None:
+    print("No LabJack device connected. Exiting...")
+    exit()
+else:
+    d.streamStart()
 
-with open('instrumentation_data.txt', 'w') as file:
+# Function to turn thermocouple voltages to kelvin
+def v_to_K(voltage):
+    voltage_actual = voltage
+    if voltage > 0.020644 and voltage < 0.054886:
+        C0 = -131.8058
+        C1 = 48.30222
+        C2 = -1.646031 
+        C3 = 0.05464731
+        C4 = -0.0009650715
+        C5 = 0.000008802193
+        C6 = -0.00000003110810
+        C7 = 0
+        C8 = 0
+        C9 = 0
+    elif voltage > -0.005891 and voltage < 0:
+        C0 = 0
+        C1 = 25.173462
+        C2 = -1.1662878
+        C3 = -1.0833638
+        C4 = -0.89773540
+        C5 = -0.37342377
+        C6 = -0.086632643
+        C7 = -0.010450598
+        C8 = -0.00051920577
+        C9 = 0
+    elif voltage > 0 and voltage < 0.020644:
+        C0 = 0
+        C1 = 25.08355
+        C2 = 0.07860106
+        C3 = -0.2503131
+        C4 = 0.08315270
+        C5 = -0.01228034
+        C6 = 0.0009804036
+        C7 = -0.0000413030
+        C8 = 0.000001057734
+        C9 = -0.00000001052755
+    else:
+       return 0
+    
+    voltage_actual = voltage_actual*1000
 
-    # Contains sensor values in SI units
-    converted = {}
+    tempC = C0 + \
+    C1*voltage_actual + C2*voltage_actual**2 + C3*voltage_actual**3 + \
+    C4*voltage_actual**4 + C5*voltage_actual**5 + C6*voltage_actual**6 + \
+    C7*voltage_actual**7 + C8*voltage_actual**8 + C9*voltage_actual**9
+   
+    return (tempC + 273.15)
 
-    for reading in d.streamData(convert=False):
+try:
+    with open('instrumentation_data.txt', 'w') as file:
 
-        # Reading is a dict of many things, one of which is the
-        # 'result' which can be passed to processStreamData() to
-        # give voltages.
+        # Contains sensor values in SI units
+        converted = {}
 
-        if reading is not None:
+        for reading in d.streamData(convert=False):
 
-            values = d.processStreamData(reading['result'])
+            # Reading is a dict of many things, one of which is the
+            # 'result' which can be passed to processStreamData() to
+            # give voltages.
 
-            # Extract values from each channel
-            P_INJECTOR   = values[CHAN_P_INJECTOR]
-            P_COMB_CHMBR = values[CHAN_P_COMB_CHMBR]
-            P_N2O_FLOW   = values[CHAN_P_N2O_FLOW]
-            P_N2_FLOW    = values[CHAN_P_N2_FLOW]
-            P_RUN_TANK   = values[CHAN_P_RUN_TANK]
+            if reading is not None:
 
-            L_RUN_TANK   = values[CHAN_L_RUN_TANK]
-            L_THRUST     = values[CHAN_L_THRUST]
+                values = d.processStreamData(reading['result'])
 
-            T_RUN_TANK   = values[CHAN_T_RUN_TANK]
-            T_INJECTOR   = values[CHAN_T_INJECTOR]
-            T_COMB_CHMBR = values[CHAN_T_COMB_CHMBR]
-            T_POST_COMB  = values[CHAN_T_POST_COMB]
+                # Extract values from each channel
+                P_INJECTOR   = values[CHAN_P_INJECTOR]
+                P_COMB_CHMBR = values[CHAN_P_COMB_CHMBR]
+                P_N2O_FLOW   = values[CHAN_P_N2O_FLOW]
+                P_N2_FLOW    = values[CHAN_P_N2_FLOW]
+                P_RUN_TANK   = values[CHAN_P_RUN_TANK]
 
-            SHUNT        = values[CHAN_SHUNT]
+                L_RUN_TANK   = values[CHAN_L_RUN_TANK]
+                L_THRUST     = values[CHAN_L_THRUST]
 
-            # Convert voltage to sensor value in SI units and store in dict
-            converted['P_INJECTOR'] = \
-            (sum(P_INJECTOR)/len(P_INJECTOR))*GAIN_P_INJECTOR
+                T_RUN_TANK   = values[CHAN_T_RUN_TANK]
+                T_INJECTOR   = values[CHAN_T_INJECTOR]
+                T_COMB_CHMBR = values[CHAN_T_COMB_CHMBR]
+                T_POST_COMB  = values[CHAN_T_POST_COMB]
 
-            converted['P_COMB_CHMBR'] = \
-            (sum(P_COMB_CHMBR)/len(P_COMB_CHMBR))*GAIN_P_COMB_CHMBR
+                SHUNT        = values[CHAN_SHUNT]
 
-            converted['P_N2O_FLOW'] = \
-            (sum(P_N2O_FLOW)/len(P_N2O_FLOW))*GAIN_P_N2O_FLOW
+                # Convert voltage to sensor value in SI units and store in dict
+                converted['P_INJECTOR'] = \
+                (sum(P_INJECTOR)/len(P_INJECTOR))*GAIN_P_INJECTOR
 
-            converted['P_N2_FLOW'] = \
-            (sum(P_N2_FLOW)/len(P_N2_FLOW))*GAIN_P_N2_FLOW
+                converted['P_COMB_CHMBR'] = \
+                (sum(P_COMB_CHMBR)/len(P_COMB_CHMBR))*GAIN_P_COMB_CHMBR
 
-            converted['P_RUN_TANK'] = \
-            (sum(P_RUN_TANK)/len(P_RUN_TANK))*GAIN_P_RUN_TANK
+                converted['P_N2O_FLOW'] = \
+                (sum(P_N2O_FLOW)/len(P_N2O_FLOW))*GAIN_P_N2O_FLOW
 
-            converted['L_RUN_TANK'] = \
-            (sum(L_RUN_TANK)/len(L_RUN_TANK))*GAIN_L_RUN_TANK+OFFSET_L_RUN_TANK
+                converted['P_N2_FLOW'] = \
+                (sum(P_N2_FLOW)/len(P_N2_FLOW))*GAIN_P_N2_FLOW
 
-            converted['L_THRUST'] = \
-            (sum(L_THRUST)/len(L_THRUST))*GAIN_L_THRUST+OFFSET_L_THRUST
+                converted['P_RUN_TANK'] = \
+                (sum(P_RUN_TANK)/len(P_RUN_TANK))*GAIN_P_RUN_TANK
 
-            # Thermocouples
-            converted['T_RUN_TANK'] = \
-                    V_to_K((sum(T_RUN_TANK)/len(T_RUN_TANK)), V_ref)
+                # Thermocouples
+                converted['T_RUN_TANK'] = \
+                        V_to_K((sum(T_RUN_TANK)/len(T_RUN_TANK)), V_ref)
 
-            converted['T_INJECTOR'] = \
-                    V_to_K((sum(T_INJECTOR)/len(T_INJECTOR)), V_ref)
+                converted['T_INJECTOR'] = \
+                        V_to_K((sum(T_INJECTOR)/len(T_INJECTOR)), V_ref)
 
-            converted['T_COMB_CHMBR'] = \
-                    V_to_K((sum(T_COMB_CHMBR)/len(T_COMB_CHMBR)), V_ref)
+                converted['T_COMB_CHMBR'] = \
+                        V_to_K((sum(T_COMB_CHMBR)/len(T_COMB_CHMBR)), V_ref)
 
-            converted['T_POST_COMB'] = \
-                    V_to_K((sum(T_POST_COMB)/len(T_POST_COMB)), V_ref)
+                converted['T_POST_COMB'] = \
+                        V_to_K((sum(T_POST_COMB)/len(T_POST_COMB)), V_ref)
 
-            # Write to file so websocket can send to ground support
-            file.write(f'{json.dumps(converted)}\n')
+                # Write to file so websocket can send to ground support
+                file.write(f'{json.dumps(converted)}\n')
