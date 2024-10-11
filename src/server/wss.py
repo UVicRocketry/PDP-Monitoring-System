@@ -94,7 +94,7 @@ class WebSocketServer:
         '''
         print("instrumentation handler")
         while True:
-            with open('instrumentation/tmp.txt', 'r') as file:
+            with open('../instrumentation/tmp.txt', 'r') as file:
                 lines = file.readlines()
                 if len(lines) > 1:
                     await websocket.send(json.dumps({
