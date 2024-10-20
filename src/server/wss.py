@@ -1,18 +1,26 @@
 import asyncio
+import time
 import websockets
 import json
 import logging
 import platform
+from testModeUtils.instrumentationMock import labjack_mock as lj_mock
+from testModeUtils.serailMock import serial_feedback_mock as serial_mock
 
 __name__ = "WebSocketServer"
 
 OS = platform.system()
 
-HOST = "192.168.0.1" if OS == "Linux" else "localhost"
+HOST_PRODUCTION = "192.168.0.1" 
+HOST_TEST = "localhost"
+
 PORT_SERIAL = 8080
 PORT_INSTRUMENTATION = 8888
 
 INSTRUMENTATION_FILE_DATA_PATH = 'tmp.txt'
+
+INSTRUMENTATION_WS_TYPE = "INSTRUMENTATION_WS"
+SERIAL_WS_TYPE = "SERIAL_WS"
 
 class Command:
     def __init__(self, command, valve, action):
@@ -27,16 +35,21 @@ class VCFeedback:
         self.action = action
 
 class WebSocketServer:
-    def __init__(self, ws_type: str):
+    def __init__(self, ws_type: str, test_mode: bool = False):
         self.__ws_type = ws_type
-        if self.__ws_type == "instrumentation":
+        self.__test_mode = test_mode
+        self.__host = HOST_PRODUCTION
+
+        if test_mode:
+            self.__test_mode = True
+            self.__host = HOST_TEST
+
+        if self.__ws_type == INSTRUMENTATION_WS_TYPE:
             self.__port = PORT_INSTRUMENTATION
         else:
             self.__port = PORT_SERIAL
 
-        print(f'type:{self.__ws_type}, port:{self.__port}')
-
-        self.__host = HOST
+        print(f'type:{self.__ws_type}, port:{self.__port}, host:{self.__host}')
         
         self.__wss_instance = None
 
@@ -104,6 +117,31 @@ class WebSocketServer:
                     await asyncio.sleep(0.1)
 
 
+    async def __test_instrumentation__handler(self, websocket):
+        print("Test Instrumentation Handler")
+        while True:
+            packet = lj_mock()
+            await websocket.send(json.dumps({
+                "identifier": "INSTRUMENTATION",
+                "data": packet
+            }))
+            await asyncio.sleep(0)
+
+
+    async def __test_serial_handler(self, websocket):
+        print("Test Serial Handler")
+        while True:
+            async for message in websocket:
+                packet = json.loads(message)
+                await websocket.send(json.dumps(serial_mock(valve=packet['valve'], action='TRANSIT')))
+                print(f"Sent: {packet['valve']} TRANSIT")
+                time.sleep(3)
+                feedback = serial_mock(valve=packet['valve'], action=packet['action'])
+                print(f"Sent: {feedback}")
+                await websocket.send(json.dumps(feedback))
+            await asyncio.sleep(0)
+
+
     async def wss_reception_handler(self, queue):
         while True:
             message = await self.__incoming_queue.get()
@@ -160,7 +198,8 @@ class WebSocketServer:
         Desc:
             Starts the websocket server
         '''
-        async with websockets.serve(self.__serial_handler, self.__host, self.__port):
+        handler = self.__serial_handler if not self.__test_mode else self.__test_serial_handler
+        async with websockets.serve(handler, self.__host, self.__port):
             await asyncio.Future()
 
     async def start_instrumentation(self):
@@ -170,6 +209,8 @@ class WebSocketServer:
         Desc:
             Starts the websocket server
         '''
-        async with websockets.serve(self.__instrumentation_handler, self.__host, self.__port):
+        handler = self.__instrumentation_handler if not self.__test_mode else self.__test_instrumentation__handler
+        async with websockets.serve(handler, self.__host, self.__port):
             await asyncio.Future()
+
         
