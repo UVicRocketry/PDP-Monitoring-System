@@ -1,11 +1,12 @@
+import os 
 import asyncio
 import time
 import websockets
 import json
 import logging
 import platform
-from testModeUtils.instrumentationMock import labjack_mock as lj_mock
-from testModeUtils.serailMock import serial_feedback_mock as serial_mock
+# from .instrumentationMock import labjack_mock as lj_mock
+# from .serailMock import serial_feedback_mock as serial_mock
 
 __name__ = "WebSocketServer"
 
@@ -17,7 +18,7 @@ HOST_TEST = "localhost"
 PORT_SERIAL = 8080
 PORT_INSTRUMENTATION = 8888
 
-INSTRUMENTATION_FILE_DATA_PATH = 'tmp.txt'
+INSTRUMENTATION_FILE_DATA_PATH = '/home/uvr/Documents/GitHub/PDP-Monitoring-System/src/instrumentation/tmp.txt'
 
 INSTRUMENTATION_WS_TYPE = "INSTRUMENTATION_WS"
 SERIAL_WS_TYPE = "SERIAL_WS"
@@ -107,14 +108,14 @@ class WebSocketServer:
         '''
         print("instrumentation handler")
         while True:
-            with open('../instrumentation/tmp.txt', 'r') as file:
+            with open(INSTRUMENTATION_FILE_DATA_PATH, 'r') as file:
                 lines = file.readlines()
                 if len(lines) > 1:
                     await websocket.send(json.dumps({
                         "identifier": "INSTRUMENTATION",
                         "data": json.loads(lines[0])
                     })) 
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.001)
 
 
     async def __test_instrumentation__handler(self, websocket):
@@ -212,5 +213,3 @@ class WebSocketServer:
         handler = self.__instrumentation_handler if not self.__test_mode else self.__test_instrumentation__handler
         async with websockets.serve(handler, self.__host, self.__port):
             await asyncio.Future()
-
-        

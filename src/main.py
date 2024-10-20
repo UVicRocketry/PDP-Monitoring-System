@@ -22,7 +22,7 @@ def main() -> None:
         exit(1)
 
     try:
-        wss = WebSocketServer("serial")
+        wss = WebSocketServer("SERIAL_WS")
     except Exception as e:
         print(f"Failed to initialize websocket server: {e}")
         exit(1)

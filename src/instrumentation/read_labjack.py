@@ -131,10 +131,10 @@ Adding a Sensor:
 ######### BEGIN USER ADJUSTABLE #########
 
 # Stream settings
-scan_frequency   = 25
+scan_frequency   = 1000
 resolution_index = 2
 settling_factor  = 2
-samples_per_packet = 50
+samples_per_packet = 12
 channel_settings = [(86, DIFF | X1000), # L_RUN_TANK (SEEMS GOOD. CHECK CAL)
                     (87, DIFF | X1000), # L_THRUST (VERY NOISY)
 
@@ -253,6 +253,7 @@ try:
                 SHUNT        = values[CHAN_SHUNT]
 
                 # Convert voltage to sensor value in SI units and store in dict
+                
                 converted['P_INJECTOR'] = \
                 (sum(P_INJECTOR)/len(P_INJECTOR))*GAIN_P_INJECTOR
 
@@ -268,6 +269,11 @@ try:
                 converted['P_RUN_TANK'] = \
                 (sum(P_RUN_TANK)/len(P_RUN_TANK))*GAIN_P_RUN_TANK
 
+                converted['L_RUN_TANK'] = \
+                (sum(L_RUN_TANK)/len(L_RUN_TANK))*GAIN_L_RUN_TANK+OFFSET_L_RUN_TANK
+
+                converted['L_THRUST'] = \
+                (sum(L_THRUST)/len(L_THRUST))*GAIN_L_THRUST+OFFSET_L_THRUST
                 # Thermocouples
                 converted['T_RUN_TANK'] = \
                         V_to_K((sum(T_RUN_TANK)/len(T_RUN_TANK)), V_ref)
