@@ -18,7 +18,8 @@ HOST_TEST = "localhost"
 PORT_SERIAL = 8080
 PORT_INSTRUMENTATION = 8888
 
-INSTRUMENTATION_FILE_DATA_PATH = '/home/uvr/Documents/GitHub/PDP-Monitoring-System/src/instrumentation/tmp.txt'
+INSTRUMENTATION_FILE_DATA_PATH = "/home/uvr/Documents/GitHub/PDP-Monitoring-System/src/instrumentation/data"
+
 
 INSTRUMENTATION_WS_TYPE = "INSTRUMENTATION_WS"
 SERIAL_WS_TYPE = "SERIAL_WS"
@@ -107,15 +108,14 @@ class WebSocketServer:
             Handles the websocket requests and serial feedback to send over the websocket
         '''
         print("instrumentation handler")
-        while True:
-            with open(INSTRUMENTATION_FILE_DATA_PATH, 'r') as file:
-                lines = file.readlines()
-                if len(lines) > 1:
-                    await websocket.send(json.dumps({
-                        "identifier": "INSTRUMENTATION",
-                        "data": json.loads(lines[0])
-                    })) 
-                    await asyncio.sleep(0.001)
+        with open(INSTRUMENTATION_FILE_DATA_PATH, 'r') as file:
+            while True:
+                lines = file.readline()
+                await websocket.send(json.dumps({
+                    "identifier": "INSTRUMENTATION",
+                    "data": json.loads(lines)
+                })) 
+                await asyncio.sleep(0.001)
 
 
     async def __test_instrumentation__handler(self, websocket):

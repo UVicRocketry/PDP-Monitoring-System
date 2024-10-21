@@ -1,6 +1,8 @@
 import u6
 import json
 from thermocouple import *
+import os
+import posix
 
 # Gains
 X1    = 0b00000000
@@ -131,7 +133,7 @@ Adding a Sensor:
 ######### BEGIN USER ADJUSTABLE #########
 
 # Stream settings
-scan_frequency   = 1000
+scan_frequency   = 500
 resolution_index = 2
 settling_factor  = 2
 samples_per_packet = 12
@@ -212,6 +214,16 @@ if samples_per_packet < len(channel_settings):
              ") must be at least the number of channels: (" + \
              str(len(channel_settings)) + ")!")
 
+pipe_path = "/home/uvr/Documents/GitHub/PDP-Monitoring-System/src/instrumentation/data"
+
+try:
+   posix.mkfifo(pipe_path)
+   print("Named pipe created successfully!")
+except FileExistsError:
+   print("Named pipe already exists!")
+except OSError as e:
+   print(f"Named pipe creation failed: {e}")             
+
 # Stream data from the LJ
 if d is None:
     print("No LabJack device connected. Exiting...")
@@ -220,7 +232,7 @@ else:
     d.streamStart()
 
 try:
-    with open('instrumentation_data.txt', 'w') as file:
+    with open(pipe_path, 'w') as file:
 
         # Contains sensor values in SI units
         converted = {}
@@ -289,13 +301,16 @@ try:
 
                 # Write to file so websocket can send to ground support
                 file.write(f'{json.dumps(converted)}\n')
-                with open('tmp.txt', 'w') as tmp:
-                  tmp.write(f'{json.dumps(converted)}')
-                  tmp.write('\n!')
+                file.flush()
+                # with open('tmp.txt', 'w') as tmp:
+                #   tmp.write(f'{json.dumps(converted)}')
+                #   tmp.write('\n!')
 except:
     print("Interrupt signal received!")
 finally:
     d.streamStop()
     print("Stream stopped.\n")
     d.close()
+    os.remove(pipe_path)
+
 
