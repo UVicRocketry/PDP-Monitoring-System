@@ -5,5 +5,5 @@ __name__ = "LJWebsocket"
 
 if __name__ == "__main__" or __name__ == "LJWebsocket":
     print("Entered Instrumentation")
-    ws = WebSocketServer("instrumentation")
+    ws = WebSocketServer("INSTRUMENTATION_WS")
     asyncio.run(ws.start_instrumentation())
