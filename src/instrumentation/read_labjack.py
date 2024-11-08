@@ -199,8 +199,6 @@ d.streamConfig(
 
 # Get cold junction voltage using LJ internal temp sensor
 V_ref = get_ref_voltage(d.getTemperature())
-print("T_ref in K: ", d.getTemperature())
-print("V_ref in V: ", V_ref)
 
 # Avoid having to power cycle the LJ on restart
 try:
@@ -238,6 +236,7 @@ try:
         converted = {}
 
         for reading in d.streamData(convert=False):
+          
 
             # Reading is a dict of many things, one of which is the
             # 'result' which can be passed to processStreamData() to
@@ -286,6 +285,7 @@ try:
 
                 converted['L_THRUST'] = \
                 (sum(L_THRUST)/len(L_THRUST))*GAIN_L_THRUST+OFFSET_L_THRUST
+
                 # Thermocouples
                 converted['T_RUN_TANK'] = \
                         V_to_K((sum(T_RUN_TANK)/len(T_RUN_TANK)), V_ref)
@@ -302,9 +302,7 @@ try:
                 # Write to file so websocket can send to ground support
                 file.write(f'{json.dumps(converted)}\n')
                 file.flush()
-                # with open('tmp.txt', 'w') as tmp:
-                #   tmp.write(f'{json.dumps(converted)}')
-                #   tmp.write('\n!')
+
 except:
     print("Interrupt signal received!")
 finally:

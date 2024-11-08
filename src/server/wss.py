@@ -5,6 +5,7 @@ import websockets
 import json
 import logging
 import platform
+import posix
 # from .instrumentationMock import labjack_mock as lj_mock
 # from .serailMock import serial_feedback_mock as serial_mock
 
@@ -60,6 +61,7 @@ class WebSocketServer:
 
         self.__incoming_queue = asyncio.LifoQueue()
         self.__configure_log()
+        self.__instrumentation_data = open(INSTRUMENTATION_FILE_DATA_PATH, 'r')
 
 
     def __configure_log(self):
@@ -108,15 +110,18 @@ class WebSocketServer:
             Handles the websocket requests and serial feedback to send over the websocket
         '''
         print("instrumentation handler")
-        with open(INSTRUMENTATION_FILE_DATA_PATH, 'r') as file:
-            while True:
-                lines = file.readline()
+        last_line = ""
+        while True:
+            lines = self.__instrumentation_data.readline()
+
+            if lines != last_line:
                 await websocket.send(json.dumps({
                     "identifier": "INSTRUMENTATION",
                     "data": json.loads(lines)
                 })) 
-                await asyncio.sleep(0.001)
-
+                last_line = lines
+            await asyncio.sleep(0.0005)
+            
 
     async def __test_instrumentation__handler(self, websocket):
         print("Test Instrumentation Handler")
