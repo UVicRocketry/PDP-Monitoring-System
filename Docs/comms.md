@@ -22,6 +22,8 @@ Either of the CPE-710s can act as the `AP` or `C`. The `AP` must be connected to
 
 This will allow you to connect to the `AP`. You can now configure/monitor the wifi system by going to the `AP`'s IP address in a web browser. 
 
+Complete configuration files for the PDP side `PDP-Antenna-Config.bin` and mission control side `Mission-Ctrl-Antenna-Config.bin` antennas are available in case the antennas are ever factory reset.
+
 **PharOS**
 
 A guide for the PharOS can be found [here](/Docs/PharOS(UN)_V1_UG.pdf)
