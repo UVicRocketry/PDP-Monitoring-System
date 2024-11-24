@@ -3,6 +3,7 @@ import json
 from thermocouple import *
 import os
 import posix
+import datetime
 
 # Gains
 X1    = 0b00000000
@@ -134,8 +135,8 @@ Adding a Sensor:
 
 # Stream settings
 scan_frequency   = 500
-resolution_index = 2
-settling_factor  = 2
+resolution_index = 4
+settling_factor  = 4
 samples_per_packet = 12
 channel_settings = [(86, DIFF | X1000), # L_RUN_TANK (SEEMS GOOD. CHECK CAL)
                     (87, DIFF | X1000), # L_THRUST (VERY NOISY)
@@ -197,14 +198,16 @@ d.streamConfig(
         SettlingFactor  = settling_factor,
         SamplesPerPacket = samples_per_packet)
 
+try:
+    d.streamStop()
+    print("Stream was still running. Stopping...")
+except:
+    pass
+
 # Get cold junction voltage using LJ internal temp sensor
 V_ref = get_ref_voltage(d.getTemperature())
 
 # Avoid having to power cycle the LJ on restart
-try:
-    d.streamStop()
-except:
-    pass
 
 if samples_per_packet < len(channel_settings):
     raise ValueError \
@@ -227,9 +230,11 @@ if d is None:
     print("No LabJack device connected. Exiting...")
     exit()
 else:
+    print("Starting stream...")
     d.streamStart()
 
 try:
+    #with open('data_log.txt', 'w') as data_log:
     with open(pipe_path, 'w') as file:
 
         # Contains sensor values in SI units
@@ -237,7 +242,6 @@ try:
 
         for reading in d.streamData(convert=False):
           
-
             # Reading is a dict of many things, one of which is the
             # 'result' which can be passed to processStreamData() to
             # give voltages.
@@ -299,9 +303,14 @@ try:
                 converted['T_POST_COMB'] = \
                         V_to_K((sum(T_POST_COMB)/len(T_POST_COMB)), V_ref)
 
+                converted['timestamp'] = str(datetime.datetime.now().time())
+
                 # Write to file so websocket can send to ground support
                 file.write(f'{json.dumps(converted)}\n')
                 file.flush()
+
+                # Log to PDP for later analysis
+                #data_log.write(f'{json.dumps(converted)}\n')
 
 except:
     print("Interrupt signal received!")
